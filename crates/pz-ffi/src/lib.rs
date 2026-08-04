@@ -613,7 +613,10 @@ unsafe fn ingest(
         }
         .ok_or(PzStatus::InvalidArgument)?;
 
-        let progress = (*decoder).inner.ingest_image(&view).map_err(PzStatus::from)?;
+        let progress = (*decoder)
+            .inner
+            .ingest_image(&view)
+            .map_err(PzStatus::from)?;
         if !out_progress.is_null() {
             *out_progress = progress_to_c(&progress);
         }

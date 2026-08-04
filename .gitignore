@@ -18,6 +18,13 @@ dist/
 pkg/
 *.tsbuildinfo
 .pnpm-store/
+*.tgz
+
+# Built by `npm run build` from the Rust sources, and again by prepublishOnly,
+# so a published tarball always matches the commit it was built from.
+packages/js/src/pz.wasm
+packages/js/LICENSE-MIT
+packages/js/LICENSE-APACHE
 
 # Python bindings
 __pycache__/

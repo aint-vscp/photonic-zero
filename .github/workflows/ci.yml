@@ -166,6 +166,62 @@ jobs:
       - name: Emit vectors
         run: cargo run --release -p pz-core --example vectors
 
+  javascript:
+    name: JavaScript / WebAssembly
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build the wasm module
+        working-directory: packages/js
+        run: npm run build
+
+      - name: Test
+        working-directory: packages/js
+        run: npm test
+
+      # Proves `npx photonic-zero` works end to end through the real computer
+      # vision path, not just that the library links.
+      - name: CLI round trip
+        working-directory: packages/js
+        run: |
+          head -c 3000 /dev/urandom > payload.bin
+          node bin/pz.mjs encode payload.bin -o frames
+          node bin/pz.mjs decode frames -o recovered.bin
+          cmp payload.bin recovered.bin
+          echo "npx round trip OK"
+
+      - name: Check the published tarball contents
+        working-directory: packages/js
+        run: npm pack --dry-run
+
+  python:
+    name: Python
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build and install the wheel
+        run: |
+          python -m pip install --upgrade pip maturin pytest
+          maturin build --manifest-path bindings/python/Cargo.toml --out dist
+          python -m pip install --find-links dist photonic-zero
+
+      - name: Test
+        run: python -m pytest bindings/python/tests -q
+
   docs:
     name: Documentation
     runs-on: ubuntu-latest

@@ -1,0 +1,36 @@
+# Its own workspace root: the binding crates are excluded from the main
+# workspace so a plain `cargo test` never needs a wasm target installed.
+[workspace]
+
+[package]
+name = "pz-wasm"
+description = "WebAssembly ABI for Photonic Zero (PZ), the rateless screen-to-camera optical protocol"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/thepieza/photonic-zero"
+homepage = "https://github.com/thepieza/photonic-zero"
+authors = ["The Pieza <hello@thepieza.com>", "Photonic Zero contributors"]
+keywords = ["wasm", "webassembly", "optical", "barcode", "qr"]
+categories = ["wasm", "encoding"]
+
+[lib]
+# `cdylib` produces the .wasm module. `rlib` lets the tests in this crate run
+# on the host, so the exported ABI is exercised by `cargo test` rather than
+# only by hand in a browser.
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+pz-core = { path = "../pz-core", version = "0.1.0" }
+
+[profile.release]
+# Size matters for something a browser downloads. `opt-level = "s"` plus fat LTO
+# and a single codegen unit trades a little speed for a noticeably smaller
+# module; `panic = "abort"` removes the unwinding tables entirely, which is also
+# required because nothing may unwind across the wasm boundary.
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

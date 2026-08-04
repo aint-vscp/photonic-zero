@@ -1,0 +1,64 @@
+{
+  "name": "photonic-zero",
+  "version": "0.1.0",
+  "description": "Data over light, from any screen to any camera. A rateless screen-to-camera optical protocol with two-layer error correction. Zero dependencies.",
+  "keywords": [
+    "optical",
+    "screen-to-camera",
+    "qr",
+    "barcode",
+    "fountain-codes",
+    "reed-solomon",
+    "air-gap",
+    "wasm",
+    "webassembly",
+    "offline"
+  ],
+  "homepage": "https://github.com/thepieza/photonic-zero#readme",
+  "bugs": "https://github.com/thepieza/photonic-zero/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/thepieza/photonic-zero.git",
+    "directory": "packages/js"
+  },
+  "license": "MIT OR Apache-2.0",
+  "author": "The Pieza <hello@thepieza.com>",
+  "type": "module",
+  "main": "./src/index.mjs",
+  "module": "./src/index.mjs",
+  "types": "./src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "import": "./src/index.mjs",
+      "default": "./src/index.mjs"
+    },
+    "./pz.wasm": "./src/pz.wasm"
+  },
+  "bin": {
+    "pz": "./bin/pz.mjs",
+    "photonic-zero": "./bin/pz.mjs"
+  },
+  "files": [
+    "src/index.mjs",
+    "src/index.d.ts",
+    "src/pz.wasm",
+    "bin/pz.mjs",
+    "README.md",
+    "LICENSE-MIT",
+    "LICENSE-APACHE"
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node --test",
+    "prepublishOnly": "node scripts/build.mjs && node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

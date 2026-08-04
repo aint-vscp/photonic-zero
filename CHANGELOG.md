@@ -11,10 +11,10 @@ While PZ is pre-1.0 the **wire format may change in any minor release**. Version
 ## [Unreleased]
 
 ### Planned
-- JavaScript/WebAssembly, Python and Java bindings.
+- Java, Swift, Go and Dart bindings. The C ABI is the portability layer.
 - A browser playground: one tab transmits, another decodes from `getUserMedia`.
-- A general PNG reader for the CLI, which currently reads only the
-  stored-deflate subset it writes itself.
+- A general PNG reader, which currently handles only the stored-deflate subset
+  the library writes itself.
 - Real-camera test corpora to complement the synthetic optical simulation.
 
 ## [0.1.0] - 2026-08-05
@@ -55,16 +55,27 @@ Initial release. Wire format version 1.
 - `pz-cli` — the `pz` tool: `encode`, `decode`, `info`, `selftest`.
 - `pz-ffi` — C ABI, with `include/photonic_zero.h` and a header-only C++17 RAII
   wrapper in `include/photonic_zero.hpp`.
+- `pz-wasm` — WebAssembly ABI.
 
 All core crates have **zero external dependencies** and build `no_std` with
 `alloc`. `pz-core` compiles for `wasm32-unknown-unknown`.
+
+**Packages**
+- `photonic-zero` on npm — a ~100 kB WebAssembly build with TypeScript
+  definitions, usable in browsers and Node, plus an `npx photonic-zero` CLI.
+  Built without `wasm-bindgen` so the package has no dependencies of its own
+  and the JavaScript glue stays readable.
+- `photonic-zero` on PyPI — `abi3` wheels, so one wheel per platform covers
+  CPython 3.8 and every later version. The decode releases the GIL.
+- `pz-core`, `pz-fec`, `pz-fountain`, `pz-vision` and `pz-cli` on crates.io.
 
 **Documentation**
 - `rfc/RFC-0001-pz-frame-format.md`, the normative wire format specification.
 - A complete C example under `examples/c/`.
 
 ### Testing
-- 214 tests in the workspace, plus 9 across the C ABI.
+- 214 tests in the workspace, 9 across the C ABI, 7 across the WebAssembly ABI,
+  16 in the JavaScript package and 23 in the Python package.
 - `crates/pz-core/tests/optical_loop.rs` decodes through a simulated camera with
   perspective, defocus, colour cast, sensor noise, partial occlusion and
   arbitrary rotation.

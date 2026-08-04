@@ -1,0 +1,60 @@
+[build-system]
+requires = ["maturin>=1.7,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "photonic-zero"
+version = "0.1.0"
+description = "Data over light, from any screen to any camera. A rateless screen-to-camera optical protocol with two-layer error correction."
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT OR Apache-2.0" }
+authors = [{ name = "The Pieza", email = "hello@thepieza.com" }]
+maintainers = [{ name = "Vash Puno", email = "vashpuno2004@gmail.com" }]
+keywords = [
+    "optical",
+    "screen-to-camera",
+    "qr",
+    "barcode",
+    "fountain-codes",
+    "reed-solomon",
+    "air-gap",
+    "offline",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Topic :: Communications",
+    "Topic :: Multimedia :: Graphics",
+    "Topic :: Security",
+    "Typing :: Typed",
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/thepieza/photonic-zero"
+Repository = "https://github.com/thepieza/photonic-zero"
+Documentation = "https://github.com/thepieza/photonic-zero#readme"
+Specification = "https://github.com/thepieza/photonic-zero/blob/main/rfc/RFC-0001-pz-frame-format.md"
+Issues = "https://github.com/thepieza/photonic-zero/issues"
+Changelog = "https://github.com/thepieza/photonic-zero/blob/main/CHANGELOG.md"
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+
+[tool.maturin]
+# The Rust extension is `photonic_zero._photonic_zero`; the pure-Python package
+# in `python/` wraps it so the public API can be documented and typed.
+module-name = "photonic_zero._photonic_zero"
+python-source = "python"
+features = ["pyo3/extension-module"]
+strip = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

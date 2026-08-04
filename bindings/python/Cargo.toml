@@ -1,0 +1,32 @@
+# Its own workspace root: the binding crates are excluded from the main
+# workspace so a plain `cargo test` never needs a Python interpreter installed.
+[workspace]
+
+[package]
+name = "photonic-zero-python"
+description = "Python bindings for Photonic Zero (PZ), the rateless screen-to-camera optical protocol"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/thepieza/photonic-zero"
+publish = false
+
+[lib]
+# maturin builds this into the `photonic_zero._photonic_zero` extension module.
+name = "_photonic_zero"
+crate-type = ["cdylib"]
+
+[dependencies]
+pz-core = { path = "../../crates/pz-core", version = "0.1.0" }
+
+[dependencies.pyo3]
+version = "0.23"
+# abi3-py38 builds one wheel that works on CPython 3.8 and every later version,
+# instead of a separate wheel per interpreter.
+features = ["extension-module", "abi3-py38"]
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1

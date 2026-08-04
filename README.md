@@ -154,6 +154,21 @@ security, a supply chain you can read in an afternoon is a feature.
 
 ---
 
+## Install
+
+| Ecosystem | Install | Package |
+|---|---|---|
+| Rust | `cargo add pz-core` | [`pz-core`](https://crates.io/crates/pz-core) |
+| Rust CLI | `cargo install pz-cli` | [`pz-cli`](https://crates.io/crates/pz-cli) |
+| JavaScript | `npm install photonic-zero` | [`photonic-zero`](https://www.npmjs.com/package/photonic-zero) |
+| Anything, no install | `npx photonic-zero selftest` | |
+| Python | `pip install photonic-zero` | [`photonic-zero`](https://pypi.org/project/photonic-zero/) |
+| C / C++ | `include/photonic_zero.h`, `.hpp` | build `crates/pz-ffi` |
+
+The JavaScript package is a ~100 kB WebAssembly build with no dependencies and
+works in browsers and Node. The Python package ships `abi3` wheels, so one wheel
+per platform covers CPython 3.8 and every later version.
+
 ## Quick start
 
 ### Rust
@@ -258,12 +273,59 @@ for (uint32_t i = 0; ; ++i) {
 std::vector<uint8_t> message = decoder.result();
 ```
 
+### JavaScript and TypeScript
+
+```console
+npm install photonic-zero
+```
+
+```js
+import { load, ProgressKind } from 'photonic-zero';
+
+// In Node the bundled module is read from disk; in a browser pass a fetch().
+const pz = await load();
+
+const encoder = pz.encode('transfer me over light');
+const { width, height, data } = encoder.frameRGBA(0, { modulePx: 8 });
+ctx.putImageData(new ImageData(data, width, height), 0, 0);
+
+const decoder = pz.decoder();
+const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
+if (decoder.ingestRGBA(frame.width, frame.height, frame.data).complete) {
+  console.log(new TextDecoder().decode(decoder.result()));
+}
+```
+
+TypeScript definitions are included. See
+[`packages/js/README.md`](packages/js/README.md) for the browser camera
+walkthrough.
+
+### Python
+
+```console
+pip install photonic-zero
+```
+
+```python
+import photonic_zero as pz
+
+encoder = pz.encode(b"transfer me over light", profile="balanced")
+open("frame0.png", "wb").write(encoder.png(0))
+
+decoder = pz.Decoder()
+status = decoder.ingest(width, height, pixels)   # RGB or RGBA bytes
+if status.complete:
+    print(decoder.result)
+```
+
+The decode releases the GIL, so it will not block other threads. See
+[`bindings/python/README.md`](bindings/python/README.md).
+
 ### Other languages
 
 The C ABI in [`include/photonic_zero.h`](include/photonic_zero.h) is the
-portability layer: anything with an FFI can call PZ today. First-class bindings
-for JavaScript/WebAssembly, Python and Java are the next milestone — see
-[CHANGELOG.md](CHANGELOG.md) and the `help wanted` issues.
+portability layer: anything with an FFI can call PZ today. Java, Swift, Go and
+Dart bindings are open as `help wanted` issues.
 
 ---
 
@@ -340,6 +402,9 @@ crates/
   pz-core       the protocol: layout, header, frame, colour, encoder, decoder, render, PNG
   pz-cli        the `pz` command line tool
   pz-ffi        C ABI
+  pz-wasm       WebAssembly ABI
+packages/js/    the npm package, with the `npx photonic-zero` CLI
+bindings/python/ the PyPI package, built with maturin
 include/        photonic_zero.h, photonic_zero.hpp
 examples/c/     a complete C program
 rfc/            RFC-0001, the normative wire format specification
@@ -358,7 +423,12 @@ $ cargo test --workspace              # 214 tests
 $ cargo test -p pz-core --test optical_loop   # decode through a simulated camera
 $ cargo check -p pz-fec -p pz-fountain -p pz-vision -p pz-core --no-default-features
 $ cargo check -p pz-core --target wasm32-unknown-unknown
-$ cargo test --manifest-path crates/pz-ffi/Cargo.toml
+$ cargo test --manifest-path crates/pz-ffi/Cargo.toml    # 9 tests
+$ cargo test --manifest-path crates/pz-wasm/Cargo.toml   # 7 tests
+
+$ cd packages/js && npm run build && npm test             # 16 tests
+$ maturin build --manifest-path bindings/python/Cargo.toml --out dist
+$ pip install --find-links dist photonic-zero && pytest bindings/python/tests -q
 ```
 
 On Windows, `. .\scripts\dev-env.ps1` puts the Rust toolchain and a 64-bit
