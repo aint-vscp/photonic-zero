@@ -1,0 +1,189 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Formatting
+        run: cargo fmt --all -- --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Tests
+        run: cargo test --workspace
+
+      # The optical loop tests are slow in a debug build and are where a real
+      # regression would show up, so they get a release run too.
+      - name: Tests (release)
+        run: cargo test --workspace --release
+
+  no_std:
+    name: no_std
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      # Easy to break by reaching for a std-only float method, so it is checked
+      # on every push rather than trusted.
+      - name: Check core+alloc only
+        run: |
+          cargo check -p pz-fec -p pz-fountain -p pz-vision -p pz-core \
+            --no-default-features
+
+  wasm:
+    name: wasm32
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Check wasm32 (with std)
+        run: cargo check -p pz-core --target wasm32-unknown-unknown
+
+      - name: Check wasm32 (core+alloc only)
+        run: |
+          cargo check -p pz-core --target wasm32-unknown-unknown \
+            --no-default-features
+
+  ffi:
+    name: C ABI
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Clippy
+        run: |
+          cargo clippy --manifest-path crates/pz-ffi/Cargo.toml \
+            --all-targets -- -D warnings
+
+      - name: Tests
+        run: cargo test --manifest-path crates/pz-ffi/Cargo.toml
+
+      - name: Build the static library
+        run: cargo build --release --manifest-path crates/pz-ffi/Cargo.toml
+
+      # Proves the header and the ABI agree, which a Rust-only test cannot.
+      - name: Compile and run the C example
+        run: |
+          cc -I include -O2 -Wall -Wextra examples/c/roundtrip.c \
+            crates/pz-ffi/target/release/libpz_ffi.a \
+            -lm -lpthread -ldl -o roundtrip
+          ./roundtrip
+
+      - name: Compile the C++ header
+        run: |
+          cat > /tmp/cpp_check.cpp <<'EOF'
+          #include "photonic_zero.hpp"
+          int main() {
+              pz::Encoder encoder{std::string("photonic zero over c++")};
+              pz::Decoder decoder;
+              for (uint32_t i = 0; i < 64; ++i) {
+                  if (decoder.ingest(encoder.frame(i)).complete()) {
+                      auto out = decoder.result();
+                      return out.empty() ? 1 : 0;
+                  }
+              }
+              return 1;
+          }
+          EOF
+          c++ -std=c++17 -I include -O2 -Wall -Wextra /tmp/cpp_check.cpp \
+            crates/pz-ffi/target/release/libpz_ffi.a \
+            -lm -lpthread -ldl -o cpp_check
+          ./cpp_check
+
+  cli:
+    name: CLI round trip
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build
+        run: cargo build --release -p pz-cli
+
+      - name: Self test
+        run: ./target/release/pz selftest
+
+      # Exercises the real computer vision path: encode to PNG files on disk,
+      # then decode those pixels back.
+      - name: Encode and decode through files
+        run: |
+          head -c 4096 /dev/urandom > payload.bin
+          ./target/release/pz encode payload.bin -o frames --profile balanced
+          ./target/release/pz decode frames/*.png -o recovered.bin
+          cmp payload.bin recovered.bin
+          echo "round trip OK"
+
+      - name: Capacity table
+        run: ./target/release/pz info
+
+  vectors:
+    name: Conformance vectors
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      # RFC-0001 quotes this output. If it changes, the wire format changed and
+      # the specification needs updating in the same pull request.
+      - name: Emit vectors
+        run: cargo run --release -p pz-core --example vectors
+
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    env:
+      RUSTDOCFLAGS: -D warnings
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build docs
+        run: cargo doc --workspace --no-deps
+
+  msrv:
+    name: MSRV 1.75
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.75.0
+      - uses: Swatinem/rust-cache@v2
+      - name: Check
+        run: cargo check --workspace

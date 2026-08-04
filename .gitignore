@@ -1,0 +1,57 @@
+# Rust
+/target/
+**/target/
+*.pdb
+*.rs.bk
+
+# The library is published as crates, not as an application, so the lock file
+# is committed for reproducible CI. Remove this line if that changes.
+# Cargo.lock
+
+# Output of `pz encode`
+/pz-frames/
+*.ppm
+
+# Node / WebAssembly bindings
+node_modules/
+dist/
+pkg/
+*.tsbuildinfo
+.pnpm-store/
+
+# Python bindings
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+*.whl
+
+# Java bindings
+bindings/java/target/
+*.class
+*.jar
+
+# C / C++ examples
+*.o
+*.a
+*.so
+*.dylib
+*.dll
+*.exe
+!scripts/*.exe
+
+# Editors and IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.fleet/
+
+# Operating system noise
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -1,0 +1,22 @@
+[package]
+name = "pz-fec"
+description = "GF(256) arithmetic, errors-and-erasures Reed-Solomon, and CRCs for the Photonic Zero (PZ) optical protocol"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+keywords = ["reed-solomon", "galois-field", "error-correction", "erasure", "no-std"]
+categories = ["encoding", "algorithms", "no-std"]
+
+[features]
+default = ["std"]
+std = []
+
+[dependencies]
+
+[lints.rust]
+missing_docs = "warn"
+unsafe_code = "forbid"

@@ -1,0 +1,24 @@
+[package]
+name = "pz-cli"
+description = "Command line tool for Photonic Zero (PZ): encode files into optical frames and decode captures back"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+keywords = ["cli", "optical", "barcode", "air-gap", "qr"]
+categories = ["command-line-utilities", "encoding"]
+
+[[bin]]
+name = "pz"
+path = "src/main.rs"
+
+[dependencies]
+# The workspace entry sets default-features = false so that pz-core can gate
+# its own std forwarding; the CLI is a binary and wants the lot.
+pz-core = { workspace = true, features = ["std", "png"] }
+
+[lints.rust]
+unsafe_code = "forbid"

@@ -1,0 +1,22 @@
+[package]
+name = "pz-fountain"
+description = "Rateless LT fountain codes with a deterministic, cross-language degree distribution, for the Photonic Zero (PZ) optical protocol"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+keywords = ["fountain-code", "lt-codes", "erasure-coding", "rateless", "no-std"]
+categories = ["encoding", "algorithms", "no-std"]
+
+[features]
+default = ["std"]
+std = []
+
+[dependencies]
+
+[lints.rust]
+missing_docs = "warn"
+unsafe_code = "forbid"

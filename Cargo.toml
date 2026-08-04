@@ -1,0 +1,39 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/pz-fec",
+    "crates/pz-fountain",
+    "crates/pz-vision",
+    "crates/pz-core",
+    "crates/pz-cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/thepieza/photonic-zero"
+homepage = "https://github.com/thepieza/photonic-zero"
+authors = ["The Pieza <hello@thepieza.com>", "Photonic Zero contributors"]
+keywords = ["optical", "fountain-codes", "reed-solomon", "air-gap", "barcode"]
+categories = ["encoding", "multimedia::images", "no-std"]
+
+[workspace.dependencies]
+pz-fec = { path = "crates/pz-fec", version = "0.1.0", default-features = false }
+pz-fountain = { path = "crates/pz-fountain", version = "0.1.0", default-features = false }
+pz-vision = { path = "crates/pz-vision", version = "0.1.0", default-features = false }
+pz-core = { path = "crates/pz-core", version = "0.1.0", default-features = false }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+panic = "abort"
+
+# The bindings crates are deliberately excluded from the default workspace so a
+# plain `cargo test` never requires a Python interpreter, a JDK, or a wasm
+# target to be present. Build them explicitly, e.g.
+#   cargo build --manifest-path crates/pz-ffi/Cargo.toml
+[workspace.metadata.pz]
+binding-crates = ["crates/pz-ffi", "crates/pz-wasm", "crates/pz-python", "crates/pz-jni"]

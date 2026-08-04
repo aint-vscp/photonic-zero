@@ -1,0 +1,30 @@
+# Deliberately its own workspace root. The binding crates are excluded from the
+# main workspace so that a plain `cargo test` at the repo root never needs a
+# Python interpreter, a JDK, or a wasm target to be installed.
+[workspace]
+
+[package]
+name = "pz-ffi"
+description = "C ABI for Photonic Zero (PZ), the rateless screen-to-camera optical protocol"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/thepieza/photonic-zero"
+homepage = "https://github.com/thepieza/photonic-zero"
+authors = ["The Pieza <hello@thepieza.com>", "Photonic Zero contributors"]
+keywords = ["ffi", "optical", "barcode", "air-gap", "c-api"]
+categories = ["external-ffi-bindings", "encoding"]
+
+[lib]
+# `staticlib` for embedding, `cdylib` for dynamic loading from Java, Python,
+# C#, Go and friends. `rlib` so the tests in this crate can link normally.
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[dependencies]
+pz-core = { path = "../pz-core", version = "0.1.0" }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
