@@ -14,11 +14,11 @@
     "webassembly",
     "offline"
   ],
-  "homepage": "https://github.com/thepieza/photonic-zero#readme",
-  "bugs": "https://github.com/thepieza/photonic-zero/issues",
+  "homepage": "https://github.com/aint-vscp/photonic-zero#readme",
+  "bugs": "https://github.com/aint-vscp/photonic-zero/issues",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/thepieza/photonic-zero.git",
+    "url": "git+https://github.com/aint-vscp/photonic-zero.git",
     "directory": "packages/js"
   },
   "license": "MIT OR Apache-2.0",

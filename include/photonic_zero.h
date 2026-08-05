@@ -10,7 +10,7 @@
  * has enough, and does not care which ones it caught.
  *
  * SPDX-License-Identifier: MIT OR Apache-2.0
- * https://github.com/thepieza/photonic-zero
+ * https://github.com/aint-vscp/photonic-zero
  *
  * ---------------------------------------------------------------------------
  * Memory and lifetime rules

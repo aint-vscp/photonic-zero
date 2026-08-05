@@ -6,7 +6,7 @@ a lot of interesting work left.
 ## Getting set up
 
 ```console
-$ git clone https://github.com/thepieza/photonic-zero
+$ git clone https://github.com/aint-vscp/photonic-zero
 $ cd photonic-zero
 $ cargo test --workspace
 ```

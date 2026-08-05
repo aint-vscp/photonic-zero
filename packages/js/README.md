@@ -152,11 +152,11 @@ and no authenticity: anyone who can see the screen can read the bytes. Encrypt
 and sign your payload before handing it to PZ. What the physical channel gives
 you is a link that does not traverse a network and cannot pass through a wall.
 
-See [SECURITY.md](https://github.com/thepieza/photonic-zero/blob/main/SECURITY.md).
+See [SECURITY.md](https://github.com/aint-vscp/photonic-zero/blob/main/SECURITY.md).
 
 ## Licence
 
 MIT or Apache-2.0, at your option.
 
 Full documentation, the protocol specification and the Rust implementation:
-[github.com/thepieza/photonic-zero](https://github.com/thepieza/photonic-zero)
+[github.com/aint-vscp/photonic-zero](https://github.com/aint-vscp/photonic-zero)

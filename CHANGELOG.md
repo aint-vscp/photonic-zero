@@ -83,5 +83,5 @@ All core crates have **zero external dependencies** and build `no_std` with
   within the correction radius, and 40 fountain transfers at up to 60% frame
   loss.
 
-[Unreleased]: https://github.com/thepieza/photonic-zero/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/thepieza/photonic-zero/releases/tag/v0.1.0
+[Unreleased]: https://github.com/aint-vscp/photonic-zero/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/aint-vscp/photonic-zero/releases/tag/v0.1.0

@@ -38,12 +38,12 @@ classifiers = [
 dependencies = []
 
 [project.urls]
-Homepage = "https://github.com/thepieza/photonic-zero"
-Repository = "https://github.com/thepieza/photonic-zero"
-Documentation = "https://github.com/thepieza/photonic-zero#readme"
-Specification = "https://github.com/thepieza/photonic-zero/blob/main/rfc/RFC-0001-pz-frame-format.md"
-Issues = "https://github.com/thepieza/photonic-zero/issues"
-Changelog = "https://github.com/thepieza/photonic-zero/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/aint-vscp/photonic-zero"
+Repository = "https://github.com/aint-vscp/photonic-zero"
+Documentation = "https://github.com/aint-vscp/photonic-zero#readme"
+Specification = "https://github.com/aint-vscp/photonic-zero/blob/main/rfc/RFC-0001-pz-frame-format.md"
+Issues = "https://github.com/aint-vscp/photonic-zero/issues"
+Changelog = "https://github.com/aint-vscp/photonic-zero/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 test = ["pytest>=7"]

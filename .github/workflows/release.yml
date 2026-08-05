@@ -280,7 +280,7 @@ jobs:
             artifacts/*.tgz
           generate_release_notes: true
           body: |
-            See [CHANGELOG.md](https://github.com/thepieza/photonic-zero/blob/main/CHANGELOG.md).
+            See [CHANGELOG.md](https://github.com/aint-vscp/photonic-zero/blob/main/CHANGELOG.md).
 
             ```console
             cargo add pz-core

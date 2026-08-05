@@ -4,7 +4,7 @@
 // become std::vector, and failures become exceptions instead of out-parameters.
 //
 // SPDX-License-Identifier: MIT OR Apache-2.0
-// https://github.com/thepieza/photonic-zero
+// https://github.com/aint-vscp/photonic-zero
 //
 //   #include "photonic_zero.hpp"
 //
