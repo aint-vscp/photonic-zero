@@ -39,14 +39,19 @@ export interface EncodeOptions {
   mode?: number;
   /** Parity code, 0 to 7. Higher spends more of each frame on repair data. */
   parity?: number;
-  /** Pin the session id instead of deriving it from the payload. */
+  /**
+   * Pin the session id instead of deriving it from the payload.
+   *
+   * An integer in `[0, 65535]`: the wire format carries 16 bits. Anything
+   * else throws rather than being truncated.
+   */
   sessionId?: number;
 }
 
 export interface RenderOptions {
-  /** Pixels per cell. Default 8. */
+  /** Pixels per cell, an integer of at least 1. Default 8. */
   modulePx?: number;
-  /** Quiet zone in cells. Default 4. */
+  /** Quiet zone in cells, a non-negative integer. Default 4. */
   quietZone?: number;
 }
 

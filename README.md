@@ -424,11 +424,12 @@ $ cargo test -p pz-core --test optical_loop   # decode through a simulated camer
 $ cargo check -p pz-fec -p pz-fountain -p pz-vision -p pz-core --no-default-features
 $ cargo check -p pz-core --target wasm32-unknown-unknown
 $ cargo test --manifest-path crates/pz-ffi/Cargo.toml    # 9 tests
-$ cargo test --manifest-path crates/pz-wasm/Cargo.toml   # 7 tests
+$ cargo test --manifest-path crates/pz-wasm/Cargo.toml   # 10 tests
 
-$ cd packages/js && npm run build && npm test             # 16 tests
+$ cd packages/js && npm run build && npm test             # 19 tests
 $ maturin build --manifest-path bindings/python/Cargo.toml --out dist
-$ pip install --find-links dist photonic-zero && pytest bindings/python/tests -q
+$ pip install --no-index --find-links dist photonic-zero  # 25 tests
+$ pytest bindings/python/tests -q
 ```
 
 On Windows, `. .\scripts\dev-env.ps1` puts the Rust toolchain and a 64-bit

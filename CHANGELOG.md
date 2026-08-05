@@ -74,8 +74,8 @@ All core crates have **zero external dependencies** and build `no_std` with
 - A complete C example under `examples/c/`.
 
 ### Testing
-- 214 tests in the workspace, 9 across the C ABI, 7 across the WebAssembly ABI,
-  16 in the JavaScript package and 23 in the Python package.
+- 214 tests in the workspace, 9 across the C ABI, 10 across the WebAssembly
+  ABI, 19 in the JavaScript package and 25 in the Python package.
 - `crates/pz-core/tests/optical_loop.rs` decodes through a simulated camera with
   perspective, defocus, colour cast, sensor noise, partial occlusion and
   arbitrary rotation.
