@@ -426,7 +426,7 @@ $ cargo check -p pz-core --target wasm32-unknown-unknown
 $ cargo test --manifest-path crates/pz-ffi/Cargo.toml    # 9 tests
 $ cargo test --manifest-path crates/pz-wasm/Cargo.toml   # 10 tests
 
-$ cd packages/js && npm run build && npm test             # 19 tests
+$ cd packages/js && npm run build && npm test             # 21 tests
 $ maturin build --manifest-path bindings/python/Cargo.toml --out dist
 $ pip install --no-index --find-links dist photonic-zero  # 25 tests
 $ pytest bindings/python/tests -q

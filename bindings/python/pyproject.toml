@@ -55,6 +55,11 @@ module-name = "photonic_zero._photonic_zero"
 python-source = "python"
 features = ["pyo3/extension-module"]
 strip = true
+# Copies of the repository root's licences. The wheel is redistributable on
+# its own, so shipping it without the texts it claims would not honour either
+# licence. maturin picks up `LICENSE*` from this directory into the wheel's
+# dist-info.
+include = ["LICENSE-MIT", "LICENSE-APACHE"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -215,6 +215,33 @@ test('render options that the ABI cannot honour are refused', () => {
   encoder.free();
 });
 
+test('custom profile codes are validated before crossing the ABI', () => {
+  // These reach the ABI as raw bytes: a float truncates and an out-of-range
+  // value wraps, so `parity: 259` would quietly build a parity-3 frame.
+  assert.throws(() => pz.encode('x', { grid: 1.5 }), PzError);
+  assert.throws(() => pz.encode('x', { grid: 5 }), PzError);
+  assert.throws(() => pz.encode('x', { mode: 3 }), PzError);
+  assert.throws(() => pz.encode('x', { parity: 259 }), PzError);
+  assert.throws(() => pz.encode('x', { parity: -1 }), PzError);
+
+  const encoder = pz.encode('x', { grid: 0, mode: 0, parity: 5 });
+  assert.equal(encoder.modules, 33);
+  encoder.free();
+});
+
+test('a render too large for wasm memory throws instead of trapping', () => {
+  const encoder = pz.encode('big render');
+
+  // A trap would kill the whole module instance, and no caller can catch it.
+  assert.throws(() => encoder.frameRGBA(0, { modulePx: 256, quietZone: 256 }), PzError);
+
+  // The instance must still be usable afterwards.
+  const frame = encoder.frameRGBA(0, { modulePx: 4 });
+  assert.equal(frame.data.length, frame.width * frame.height * 4);
+
+  encoder.free();
+});
+
 test('a session id wider than the wire format is refused', () => {
   assert.throws(() => pz.encode('x', { sessionId: 65536 }), PzError);
   assert.throws(() => pz.encode('x', { sessionId: -1 }), PzError);

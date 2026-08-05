@@ -54,9 +54,31 @@ function whole(value, name, min, max) {
  */
 function renderOptions({ modulePx = 8, quietZone = 4 } = {}) {
   return {
-    modulePx: whole(modulePx, 'modulePx', 1, 4096),
-    quietZone: whole(quietZone, 'quietZone', 0, 4096),
+    modulePx: whole(modulePx, 'modulePx', 1, 256),
+    quietZone: whole(quietZone, 'quietZone', 0, 256),
   };
+}
+
+/** Largest RGBA render this will attempt, in bytes. */
+const MAX_RENDER_BYTES = 256 * 1024 * 1024;
+
+/**
+ * Refuse a render the module could not allocate.
+ *
+ * Bounding each option on its own is not enough: they multiply. Left
+ * unchecked the module traps on a failed allocation, which kills the whole
+ * instance, and a trap is not something a caller can catch and recover from.
+ */
+function checkRenderSize(modules, modulePx, quietZone) {
+  const side = (modules + quietZone * 2) * modulePx;
+  const bytes = side * side * 4;
+  if (bytes > MAX_RENDER_BYTES) {
+    throw new PzError(
+      `render of ${side}x${side} needs ${Math.round(bytes / 1048576)} MiB, ` +
+        `over the ${MAX_RENDER_BYTES / 1048576} MiB limit; reduce modulePx or quietZone`,
+    );
+  }
+  return side;
 }
 
 /**
@@ -81,7 +103,17 @@ export async function load(source) {
     ({ instance } = await WebAssembly.instantiate(source, {}));
   } else {
     // A Response, or a promise of one, from fetch().
-    ({ instance } = await WebAssembly.instantiateStreaming(source, {}));
+    //
+    // Streaming compilation insists on `application/wasm`, and plenty of
+    // static hosts serve .wasm as octet-stream. Falling back to the buffered
+    // path costs one copy and turns a hard failure into a working load.
+    try {
+      ({ instance } = await WebAssembly.instantiateStreaming(source, {}));
+    } catch (error) {
+      const response = await source;
+      if (typeof response?.arrayBuffer !== 'function') throw error;
+      ({ instance } = await WebAssembly.instantiate(await response.arrayBuffer(), {}));
+    }
   }
 
   return new Pz(instance);
@@ -159,9 +191,13 @@ export class Pz {
         `unknown profile ${options.profile}; expected one of ${Object.keys(PROFILES).join(', ')}`,
       );
     }
-    const grid = options.grid ?? preset[0];
-    const mode = options.mode ?? preset[1];
-    const parity = options.parity ?? preset[2];
+    // The overrides cross the ABI as raw bytes, where a float is truncated and
+    // an out-of-range value wraps. `parity: 259` silently becoming 3 would
+    // build a frame the caller never asked for.
+    const grid = options.grid === undefined ? preset[0] : whole(options.grid, 'grid', 0, 4);
+    const mode = options.mode === undefined ? preset[1] : whole(options.mode, 'mode', 0, 2);
+    const parity =
+      options.parity === undefined ? preset[2] : whole(options.parity, 'parity', 0, 7);
     // A session id is 16 bits on the wire. Catching that here gives a usable
     // message; letting it through returns a null handle and a vague one.
     const session =
@@ -231,6 +267,7 @@ export class Encoder {
     this._check();
     whole(index, 'index', 0, 0xffffffff);
     const { modulePx, quietZone } = renderOptions(options);
+    const side = checkRenderSize(this.modules, modulePx, quietZone);
     const out = this._pz._scratch();
     const ptr = this._pz.exports.pz_encoder_frame_rgba(
       this._handle, index, modulePx, quietZone, out,
@@ -240,7 +277,6 @@ export class Encoder {
     const data = this._pz._take(ptr, len);
     if (data === null) throw new PzError(`could not render frame ${index}`);
 
-    const side = (this.modules + quietZone * 2) * modulePx;
     return {
       width: side,
       height: side,
@@ -253,6 +289,7 @@ export class Encoder {
     this._check();
     whole(index, 'index', 0, 0xffffffff);
     const { modulePx, quietZone } = renderOptions(options);
+    checkRenderSize(this.modules, modulePx, quietZone);
     const out = this._pz._scratch();
     const ptr = this._pz.exports.pz_encoder_frame_png(
       this._handle, index, modulePx, quietZone, out,

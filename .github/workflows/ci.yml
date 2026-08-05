@@ -217,7 +217,9 @@ jobs:
         run: |
           python -m pip install --upgrade pip maturin pytest
           maturin build --manifest-path bindings/python/Cargo.toml --out dist
-          python -m pip install --find-links dist photonic-zero
+          # --no-index: once this version is on PyPI, a plain --find-links can
+          # resolve the published wheel and let a broken local build pass.
+          python -m pip install --no-index --find-links dist photonic-zero
 
       - name: Test
         run: python -m pytest bindings/python/tests -q
