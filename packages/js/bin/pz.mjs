@@ -77,6 +77,22 @@ function collectFiles(inputs) {
   return files;
 }
 
+/**
+ * Read a numeric flag, refusing anything that is not a whole number.
+ *
+ * Bare `Number()` turns a typo into `NaN`, and a loop bounded by `NaN` writes
+ * nothing at all while cheerfully reporting success.
+ */
+function wholeArg(raw, name, min, max) {
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < min || value > max) {
+    throw new Error(
+      `--${name} must be a whole number in [${min}, ${max}], got "${raw}"`,
+    );
+  }
+  return value;
+}
+
 async function cmdEncode(positional, flags) {
   const source = positional[0];
   if (!source) throw new Error('encode needs an input file');
@@ -89,17 +105,23 @@ async function cmdEncode(positional, flags) {
   const sessionRaw = flag(flags, '', 'session', undefined);
   const encoder = pz.encode(payload, {
     profile,
-    sessionId: sessionRaw === undefined ? undefined : Number(sessionRaw),
+    sessionId:
+      sessionRaw === undefined
+        ? undefined
+        : wholeArg(sessionRaw, 'session', 0, 0xffff),
   });
 
   const outDir = flag(flags, 'o', 'out', 'pz-frames');
   mkdirSync(outDir, { recursive: true });
 
-  const modulePx = Number(flag(flags, '', 'module-px', 8));
-  const quietZone = Number(flag(flags, '', 'quiet', 4));
+  const modulePx = wholeArg(flag(flags, '', 'module-px', 8), 'module-px', 1, 4096);
+  const quietZone = wholeArg(flag(flags, '', 'quiet', 4), 'quiet', 0, 4096);
   const minimum = encoder.blockCount;
-  const count = Number(
+  const count = wholeArg(
     flag(flags, 'n', 'frames', minimum + Math.floor(minimum / 2) + 4),
+    'frames',
+    1,
+    1_000_000,
   );
 
   for (let index = 0; index < count; index++) {

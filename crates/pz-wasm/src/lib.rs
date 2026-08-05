@@ -19,7 +19,6 @@
 
 #![deny(missing_docs)]
 
-use std::mem;
 use std::ptr;
 use std::slice;
 
@@ -34,10 +33,12 @@ pub extern "C" fn pz_alloc(len: usize) -> *mut u8 {
     if len == 0 {
         return ptr::null_mut();
     }
-    let mut buffer = Vec::<u8>::with_capacity(len);
-    let ptr = buffer.as_mut_ptr();
-    mem::forget(buffer);
-    ptr
+    // A boxed slice, not `Vec::with_capacity`: `with_capacity` promises only
+    // *at least* `len` bytes, and `pz_free` reconstructs the Vec with capacity
+    // exactly `len`. Deallocating with the wrong layout would be undefined, so
+    // the exactness has to be guaranteed rather than assumed.
+    let buffer = vec![0u8; len].into_boxed_slice();
+    Box::into_raw(buffer).cast::<u8>()
 }
 
 /// Release a buffer obtained from [`pz_alloc`] or returned by this module.
@@ -58,19 +59,20 @@ pub extern "C" fn pz_protocol_version() -> u32 {
 }
 
 fn into_buffer(bytes: Vec<u8>, out_len: *mut usize) -> *mut u8 {
-    let len = bytes.len();
-    if len == 0 {
+    if bytes.is_empty() {
         return ptr::null_mut();
     }
-    // Shrink so that capacity == len, which is what `pz_free` will assume.
-    let mut bytes = bytes;
-    bytes.shrink_to_fit();
-    let ptr = bytes.as_mut_ptr();
-    let cap = bytes.capacity();
-    mem::forget(bytes);
+    // `into_boxed_slice` reallocates if it has to so that capacity == length
+    // exactly. `shrink_to_fit` would not do: it is best-effort, and the
+    // allocator may leave spare capacity. That distinction matters twice over,
+    // because the number written to `out_len` is both the payload length the
+    // caller reads and the length `pz_free` reconstructs the Vec with.
+    let boxed = bytes.into_boxed_slice();
+    let len = boxed.len();
+    let ptr = Box::into_raw(boxed).cast::<u8>();
     if !out_len.is_null() {
         // Safety: the caller promises this points at a writable usize.
-        unsafe { *out_len = cap };
+        unsafe { *out_len = len };
     }
     ptr
 }
@@ -85,7 +87,9 @@ pub struct WasmEncoder {
 /// Create an encoder over `len` bytes at `payload`.
 ///
 /// `grid`, `mode` and `parity` are the header codes; pass a negative
-/// `session` to derive one from the payload. Returns null on failure.
+/// `session` to derive one from the payload. A non-negative `session` above
+/// 65535 does not fit the wire format and is rejected rather than truncated.
+/// Returns null on failure.
 ///
 /// # Safety
 /// `payload` must point to `len` readable bytes.
@@ -104,15 +108,21 @@ pub unsafe extern "C" fn pz_encoder_new(
     let (Some(grid), Some(mode)) = (GridSize::from_code(grid), ColorMode::from_code(mode)) else {
         return ptr::null_mut();
     };
+    // A session id is 16 bits on the wire. Truncating 65536 to 0 would hand
+    // back an encoder that silently ignores the id the caller pinned.
+    let session_id = if session < 0 {
+        None
+    } else {
+        match u16::try_from(session) {
+            Ok(id) => Some(id),
+            Err(_) => return ptr::null_mut(),
+        }
+    };
     let config = EncoderConfig {
         grid,
         mode,
         parity_code: parity,
-        session_id: if session < 0 {
-            None
-        } else {
-            Some(session as u16)
-        },
+        session_id,
         soliton: pz_core::SolitonParams::default(),
     };
     match Encoder::new(slice::from_raw_parts(payload, len), config) {
@@ -241,12 +251,32 @@ pub unsafe extern "C" fn pz_encoder_frame_png(
 
 /// Opaque decoder handle, carrying the outcome of the last ingest so that
 /// JavaScript can read it without a struct crossing the boundary.
+///
+/// Block counts are deliberately *not* cached here. They are read straight off
+/// the inner decoder, so a routine `NotFound` cannot clobber them and a
+/// `Complete` cannot leave them stale.
 pub struct WasmDecoder {
     inner: Decoder,
     kind: i32,
-    recovered: usize,
-    total: usize,
     frame_index: u32,
+}
+
+/// Feed one view into the decoder and translate the outcome into an ABI code.
+///
+/// Shared by both ingest entry points so the two cannot drift apart.
+fn ingest(state: &mut WasmDecoder, view: &RgbView<'_>) -> i32 {
+    let kind = match state.inner.ingest_image(view) {
+        Ok(Progress::NotFound) => 0,
+        Ok(Progress::Rejected) => 1,
+        Ok(Progress::Progressed { frame_index, .. }) => {
+            state.frame_index = frame_index;
+            2
+        }
+        Ok(Progress::Complete(_)) => 3,
+        Err(_) => -1,
+    };
+    state.kind = kind;
+    kind
 }
 
 /// Create a decoder.
@@ -255,8 +285,6 @@ pub extern "C" fn pz_decoder_new() -> *mut WasmDecoder {
     Box::into_raw(Box::new(WasmDecoder {
         inner: Decoder::new(),
         kind: 0,
-        recovered: 0,
-        total: 0,
         frame_index: 0,
     }))
 }
@@ -281,8 +309,7 @@ pub unsafe extern "C" fn pz_decoder_reset(decoder: *mut WasmDecoder) {
     if !decoder.is_null() {
         (*decoder).inner.reset();
         (*decoder).kind = 0;
-        (*decoder).recovered = 0;
-        (*decoder).total = 0;
+        (*decoder).frame_index = 0;
     }
 }
 
@@ -313,26 +340,7 @@ pub unsafe extern "C" fn pz_decoder_ingest_rgba(
         return -1;
     };
 
-    let state = &mut *decoder;
-    let kind = match state.inner.ingest_image(&view) {
-        Ok(Progress::NotFound) => 0,
-        Ok(Progress::Rejected) => 1,
-        Ok(Progress::Progressed {
-            frame_index,
-            recovered,
-            total,
-            ..
-        }) => {
-            state.frame_index = frame_index;
-            state.recovered = recovered;
-            state.total = total;
-            2
-        }
-        Ok(Progress::Complete(_)) => 3,
-        Err(_) => -1,
-    };
-    state.kind = kind;
-    kind
+    ingest(&mut *decoder, &view)
 }
 
 /// Offer a PNG file, decoding it internally.
@@ -363,26 +371,7 @@ pub unsafe extern "C" fn pz_decoder_ingest_png(
         return -2;
     };
 
-    let state = &mut *decoder;
-    let kind = match state.inner.ingest_image(&view) {
-        Ok(Progress::NotFound) => 0,
-        Ok(Progress::Rejected) => 1,
-        Ok(Progress::Progressed {
-            frame_index,
-            recovered,
-            total,
-            ..
-        }) => {
-            state.frame_index = frame_index;
-            state.recovered = recovered;
-            state.total = total;
-            2
-        }
-        Ok(Progress::Complete(_)) => 3,
-        Err(_) => -1,
-    };
-    state.kind = kind;
-    kind
+    ingest(&mut *decoder, &view)
 }
 
 macro_rules! decoder_getter {
@@ -401,8 +390,8 @@ macro_rules! decoder_getter {
 }
 
 decoder_getter!(pz_decoder_progress, f64, |d| d.inner.progress());
-decoder_getter!(pz_decoder_recovered, usize, |d| d.recovered);
-decoder_getter!(pz_decoder_total, usize, |d| d.total);
+decoder_getter!(pz_decoder_recovered, usize, |d| d.inner.recovered());
+decoder_getter!(pz_decoder_total, usize, |d| d.inner.total());
 decoder_getter!(pz_decoder_frame_index, u32, |d| d.frame_index);
 decoder_getter!(pz_decoder_frames_seen, usize, |d| d.inner.frames_seen());
 decoder_getter!(pz_decoder_frames_accepted, usize, |d| d
@@ -556,5 +545,69 @@ mod tests {
     #[test]
     fn reports_the_protocol_version() {
         assert_eq!(pz_protocol_version(), 1);
+    }
+
+    /// A completed transfer must report `recovered == total`, and a routine
+    /// `NotFound` afterwards must not reset either. Caching the counters in
+    /// the handle used to get both of these wrong.
+    #[test]
+    fn counters_survive_completion_and_a_later_miss() {
+        let payload = b"counters stay honest";
+        unsafe {
+            let encoder = pz_encoder_new(payload.as_ptr(), payload.len(), 1, 2, 3, -1);
+            let decoder = pz_decoder_new();
+
+            let mut len = 0usize;
+            let rgba = pz_encoder_frame_rgba(encoder, 0, 6, 4, &mut len);
+            let side = (49 + 8) * 6;
+            assert_eq!(pz_decoder_ingest_rgba(decoder, side, side, rgba, len), 3);
+            pz_free(rgba, len);
+
+            let total = pz_decoder_total(decoder);
+            assert!(total > 0, "total must be known once a session is locked on");
+            assert_eq!(pz_decoder_recovered(decoder), total);
+
+            // A blank image finds nothing. That must not disturb the counters.
+            let blank = vec![255u8; side * side * 4];
+            assert_eq!(
+                pz_decoder_ingest_rgba(decoder, side, side, blank.as_ptr(), blank.len()),
+                0
+            );
+            assert_eq!(pz_decoder_recovered(decoder), total);
+            assert_eq!(pz_decoder_total(decoder), total);
+
+            pz_decoder_free(decoder);
+            pz_encoder_free(encoder);
+        }
+    }
+
+    /// A session id wider than the wire format must be refused, not truncated.
+    #[test]
+    fn out_of_range_session_ids_are_rejected() {
+        let payload = b"session range";
+        unsafe {
+            assert!(pz_encoder_new(payload.as_ptr(), payload.len(), 1, 2, 3, 65_536).is_null());
+            let ok = pz_encoder_new(payload.as_ptr(), payload.len(), 1, 2, 3, 65_535);
+            assert!(!ok.is_null());
+            assert_eq!(pz_encoder_session_id(ok), 65_535);
+            pz_encoder_free(ok);
+        }
+    }
+
+    /// `out_len` must be the payload length, not an allocator-chosen capacity.
+    #[test]
+    fn reported_length_is_exact() {
+        unsafe {
+            let mut len = 0usize;
+            // 4096 bytes is well past the point where a Vec would over-allocate
+            // if it were going to.
+            let payload = vec![0xC3u8; 4096];
+            let encoder = pz_encoder_new(payload.as_ptr(), payload.len(), 0, 0, 5, 1);
+            let cells = pz_encoder_frame_cells(encoder, 0, &mut len);
+            assert!(!cells.is_null());
+            assert_eq!(len, 33 * 33, "cell buffer must be exactly one per cell");
+            pz_free(cells, len);
+            pz_encoder_free(encoder);
+        }
     }
 }

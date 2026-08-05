@@ -556,6 +556,24 @@ impl Decoder {
         self.session.as_ref().map_or(0.0, |s| s.fountain.progress())
     }
 
+    /// Source blocks recovered so far.
+    ///
+    /// Equals [`Self::total`] once decoding has finished, and is zero before a
+    /// session has been locked on to.
+    #[must_use]
+    pub fn recovered(&self) -> usize {
+        self.session.as_ref().map_or(0, |s| s.fountain.recovered())
+    }
+
+    /// Source blocks in the message, or zero before a session has been locked
+    /// on to.
+    #[must_use]
+    pub fn total(&self) -> usize {
+        self.session
+            .as_ref()
+            .map_or(0, |s| s.fountain.block_count())
+    }
+
     /// The completed message, if decoding has finished.
     #[must_use]
     pub fn result(&self) -> Option<&[u8]> {

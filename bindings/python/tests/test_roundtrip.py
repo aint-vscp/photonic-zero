@@ -176,6 +176,50 @@ def test_noise_does_not_decode():
     assert decoder.result is None
 
 
+def test_counters_are_correct_on_completion_and_survive_a_miss():
+    """`recovered`/`total` must mean what the docstring says at every stage.
+
+    Reading them off the `Progress` variant meant a routine `NotFound`
+    reported 0/0 mid-transfer, and `Complete` reported 0/0 at the one moment
+    a caller most wants the numbers.
+    """
+    encoder = pz.Encoder(b"\x5a" * 4096)
+    decoder = pz.Decoder()
+
+    status = None
+    for index in range(64):
+        width, height, pixels = encoder.rgb(index, module_px=4)
+        status = decoder.ingest(width, height, pixels)
+        if status.complete:
+            break
+
+    assert status is not None and status.complete, "transfer never completed"
+    assert status.total > 1
+    assert status.recovered == status.total
+    assert status.fraction == 1.0
+
+    # A blank image finds nothing, and must not zero the counters.
+    side = 200
+    miss = decoder.ingest(side, side, b"\xff" * (side * side * 3))
+    assert miss.kind == pz.ProgressKind.NotFound
+    assert miss.total == status.total
+    assert miss.recovered == status.recovered
+
+
+def test_counters_track_a_partial_transfer():
+    """Mid-transfer the counters must be real, not zero."""
+    encoder = pz.Encoder(b"\x11" * 4096)
+    decoder = pz.Decoder()
+
+    width, height, pixels = encoder.rgb(0, module_px=4)
+    status = decoder.ingest(width, height, pixels)
+
+    assert status.kind == pz.ProgressKind.Progressed
+    assert not status.complete
+    assert status.total > 1
+    assert 0 < status.recovered < status.total
+
+
 def test_profile_info():
     modules, bits, cells, droplet = pz.profile_info("fast")
     assert modules == 97

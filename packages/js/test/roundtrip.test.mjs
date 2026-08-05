@@ -190,3 +190,65 @@ test('a bad image length is reported rather than read out of bounds', () => {
   assert.throws(() => decoder.ingestRGBA(1000, 1000, new Uint8Array(16)), PzError);
   decoder.free();
 });
+
+test('render options that the ABI cannot honour are refused', () => {
+  const encoder = pz.encode('render options');
+
+  // Rust clamps module_px up to 1 and wasm truncates a float, so accepting
+  // these would report dimensions that disagree with the returned buffer.
+  assert.throws(() => encoder.frameRGBA(0, { modulePx: 0 }), PzError);
+  assert.throws(() => encoder.frameRGBA(0, { modulePx: 2.5 }), PzError);
+  assert.throws(() => encoder.frameRGBA(0, { modulePx: 'big' }), PzError);
+  assert.throws(() => encoder.frameRGBA(0, { quietZone: -1 }), PzError);
+  assert.throws(() => encoder.framePNG(0, { modulePx: 0 }), PzError);
+  assert.throws(() => encoder.frameRGBA(-1), PzError);
+  assert.throws(() => encoder.frameCells(1.5), PzError);
+
+  // The reported size must match the buffer exactly, at any legal scale.
+  for (const modulePx of [1, 3, 8]) {
+    const frame = encoder.frameRGBA(0, { modulePx, quietZone: 4 });
+    assert.equal(frame.width, frame.height);
+    assert.equal(frame.data.length, frame.width * frame.height * 4);
+    assert.equal(frame.width, (encoder.modules + 8) * modulePx);
+  }
+
+  encoder.free();
+});
+
+test('a session id wider than the wire format is refused', () => {
+  assert.throws(() => pz.encode('x', { sessionId: 65536 }), PzError);
+  assert.throws(() => pz.encode('x', { sessionId: -1 }), PzError);
+  assert.throws(() => pz.encode('x', { sessionId: 1.5 }), PzError);
+
+  const encoder = pz.encode('x', { sessionId: 65535 });
+  assert.equal(encoder.sessionId, 65535);
+  encoder.free();
+});
+
+test('block counters are correct on completion and survive a later miss', () => {
+  const payload = new Uint8Array(4096).fill(0x5a);
+  const encoder = pz.encode(payload);
+  const decoder = pz.decoder();
+
+  let status;
+  for (let index = 0; index < 64; index++) {
+    const frame = encoder.frameRGBA(index, { modulePx: 4 });
+    status = decoder.ingestRGBA(frame.width, frame.height, frame.data);
+    if (status.complete) break;
+  }
+
+  assert.ok(status.complete, 'transfer never completed');
+  assert.ok(status.total > 1, 'total must be known once a session exists');
+  assert.equal(status.recovered, status.total, 'complete means every block in');
+  assert.equal(status.fraction, 1);
+
+  // A blank frame finds nothing. That must not zero the counters.
+  const blank = new Uint8ClampedArray(200 * 200 * 4).fill(255);
+  const miss = decoder.ingestRGBA(200, 200, blank);
+  assert.equal(miss.kind, ProgressKind.NotFound);
+  assert.equal(miss.total, status.total);
+  assert.equal(miss.recovered, status.recovered);
+
+  encoder.free();
+  decoder.free();
+});

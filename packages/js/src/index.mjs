@@ -36,6 +36,29 @@ export class PzError extends Error {
   }
 }
 
+/** Require a whole number in `[min, max]`, or explain why it is not one. */
+function whole(value, name, min, max) {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < min || value > max) {
+    throw new PzError(`${name} must be an integer in [${min}, ${max}], got ${value}`);
+  }
+  return value;
+}
+
+/**
+ * Settle render options to the values the ABI will actually use.
+ *
+ * WebAssembly truncates a fractional argument and the Rust side clamps
+ * `module_px` up to 1, so computing pixel dimensions from the raw JavaScript
+ * value can disagree with the buffer that comes back. Rejecting the bad input
+ * outright beats papering over the mismatch.
+ */
+function renderOptions({ modulePx = 8, quietZone = 4 } = {}) {
+  return {
+    modulePx: whole(modulePx, 'modulePx', 1, 4096),
+    quietZone: whole(quietZone, 'quietZone', 0, 4096),
+  };
+}
+
 /**
  * Instantiate the WebAssembly module.
  *
@@ -139,7 +162,12 @@ export class Pz {
     const grid = options.grid ?? preset[0];
     const mode = options.mode ?? preset[1];
     const parity = options.parity ?? preset[2];
-    const session = options.sessionId ?? -1;
+    // A session id is 16 bits on the wire. Catching that here gives a usable
+    // message; letting it through returns a null handle and a vague one.
+    const session =
+      options.sessionId === undefined || options.sessionId === null
+        ? -1
+        : whole(options.sessionId, 'sessionId', 0, 0xffff);
 
     const [ptr, len] = this._write(bytes);
     const handle = this.exports.pz_encoder_new(ptr, len, grid, mode, parity, session);
@@ -199,8 +227,10 @@ export class Encoder {
    *
    * @returns {{width: number, height: number, data: Uint8ClampedArray}}
    */
-  frameRGBA(index, { modulePx = 8, quietZone = 4 } = {}) {
+  frameRGBA(index, options = {}) {
     this._check();
+    whole(index, 'index', 0, 0xffffffff);
+    const { modulePx, quietZone } = renderOptions(options);
     const out = this._pz._scratch();
     const ptr = this._pz.exports.pz_encoder_frame_rgba(
       this._handle, index, modulePx, quietZone, out,
@@ -219,8 +249,10 @@ export class Encoder {
   }
 
   /** One frame as a complete PNG file. */
-  framePNG(index, { modulePx = 8, quietZone = 4 } = {}) {
+  framePNG(index, options = {}) {
     this._check();
+    whole(index, 'index', 0, 0xffffffff);
+    const { modulePx, quietZone } = renderOptions(options);
     const out = this._pz._scratch();
     const ptr = this._pz.exports.pz_encoder_frame_png(
       this._handle, index, modulePx, quietZone, out,
@@ -235,6 +267,7 @@ export class Encoder {
   /** One frame as raw colour codes, one byte per cell, row-major. */
   frameCells(index) {
     this._check();
+    whole(index, 'index', 0, 0xffffffff);
     const out = this._pz._scratch();
     const ptr = this._pz.exports.pz_encoder_frame_cells(this._handle, index, out);
     const len = this._pz._readLen(out);

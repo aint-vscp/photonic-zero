@@ -358,37 +358,22 @@ impl Decoder {
 
 impl Decoder {
     fn status(progress: Progress, decoder: &CoreDecoder) -> Status {
-        match progress {
-            Progress::NotFound => Status {
-                kind: ProgressKind::NotFound,
-                complete: false,
-                recovered: 0,
-                total: 0,
-                fraction: decoder.progress(),
-            },
-            Progress::Rejected => Status {
-                kind: ProgressKind::Rejected,
-                complete: false,
-                recovered: 0,
-                total: 0,
-                fraction: decoder.progress(),
-            },
-            Progress::Progressed {
-                recovered, total, ..
-            } => Status {
-                kind: ProgressKind::Progressed,
-                complete: false,
-                recovered,
-                total,
-                fraction: decoder.progress(),
-            },
-            Progress::Complete(_) => Status {
-                kind: ProgressKind::Complete,
-                complete: true,
-                recovered: 0,
-                total: 0,
-                fraction: 1.0,
-            },
+        // Every field is read from the decoder rather than from the `Progress`
+        // variant. Taking the counts from the variant meant a routine
+        // `NotFound` reported 0/0 halfway through a transfer, and a `Complete`
+        // reported 0/0 at the very moment the numbers mattered most.
+        let kind = match progress {
+            Progress::NotFound => ProgressKind::NotFound,
+            Progress::Rejected => ProgressKind::Rejected,
+            Progress::Progressed { .. } => ProgressKind::Progressed,
+            Progress::Complete(_) => ProgressKind::Complete,
+        };
+        Status {
+            kind,
+            complete: kind == ProgressKind::Complete,
+            recovered: decoder.recovered(),
+            total: decoder.total(),
+            fraction: decoder.progress(),
         }
     }
 }
