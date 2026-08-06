@@ -123,6 +123,7 @@
           <span class="drop-secondary">or drop one here</span>
         </label>
 
+        <button class="ghost" id="tiny" type="button">Send a 2 kB test first</button>
         <button class="ghost" id="sample" type="button">Use a 1 MB sample instead</button>
 
         <div class="field">
@@ -133,6 +134,16 @@
             <option value="resilient">resilient — 65², 4 colours</option>
             <option value="balanced">balanced — 49², 8 colours</option>
             <option value="robust">robust — 33², single colour</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="rate">Frames per second</label>
+          <select id="rate">
+            <option value="8">8 — slowest, most reliable</option>
+            <option value="12" selected>12 — recommended</option>
+            <option value="15">15</option>
+            <option value="20">20 — needs a steady hand</option>
           </select>
         </div>
 
@@ -152,7 +163,7 @@
         </dl>
 
         <button class="primary" id="transmit" type="button" disabled>Transmit</button>
-        <p class="note">Fills the screen. Tap or press Escape to stop.</p>
+        <p class="note">Fills the screen. Tap or press Escape to stop.<br>Hold the phone about a hand's width away and let it focus.</p>
       </article>
 
       <article class="panel" id="panel-receive">

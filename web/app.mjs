@@ -182,9 +182,11 @@ function buildPlan() {
   }
   owned.encoder = encoder;
 
-  // 30 fps display, and a real capture misses some. The library's own estimate
-  // assumes 80% of frames land, which matches a phone held reasonably still.
-  const seconds = (encoder.blockCount * 1.15) / 30 / 0.8;
+  // Estimate from the rate actually being emitted, not the display refresh.
+  // The 1.15 is fountain overhead; the 0.75 is the share of emitted frames a
+  // hand-held camera really captures cleanly.
+  const emitFps = Number($('rate').value);
+  const seconds = (encoder.blockCount * 1.15) / emitFps / 0.75;
 
   plan.hidden = false;
   plan.querySelector('[data-k="size"]').textContent =
@@ -245,6 +247,18 @@ $('sample').addEventListener('click', () => {
 });
 
 $('profile').addEventListener('change', () => { syncInkField(); buildPlan(); });
+$('rate').addEventListener('change', buildPlan);
+
+// A payload small enough to finish in a couple of seconds. Worth confirming the
+// camera can lock on at all before committing to a transfer measured in minutes.
+$('tiny').addEventListener('click', () => {
+  const bytes = new Uint8Array(2048);
+  crypto.getRandomValues(bytes);
+  pending = { bytes, name: 'test-2kb.bin' };
+  drop.querySelector('.drop-primary').textContent = 'test-2kb.bin';
+  drop.querySelector('.drop-secondary').textContent = '2 kB · lock-on check';
+  buildPlan();
+});
 
 /**
  * Ink only means anything in a two-level mode.
@@ -306,12 +320,26 @@ function startBeam() {
 
   const monochrome = ['mono', 'robust'].includes($('profile').value);
   const ink = monochrome ? $('ink').value : undefined;
+  const emitFps = Number($('rate').value);
 
-  function tick() {
-    const frame = encoder.frameRGBA(index, { modulePx, quietZone: quiet, ink });
-    beamCtx.putImageData(new ImageData(frame.data, frame.width, frame.height), 0, 0);
-    if ((index & 7) === 0) label.textContent = `frame ${index}`;
-    index++;
+  // Hold each droplet for a whole period.
+  //
+  // Emitting one per animation frame runs at the display's refresh rate, 60 Hz
+  // or more, against a camera capturing at about 30. Every exposure then
+  // straddles a screen update and returns an image that is part one droplet and
+  // part the next; those fail the frame CRC, so essentially nothing decodes.
+  // Holding well below the capture rate guarantees whole frames instead.
+  const period = 1000 / emitFps;
+  let shownAt = 0;
+
+  function tick(now) {
+    if (now - shownAt >= period) {
+      shownAt = now;
+      const frame = encoder.frameRGBA(index, { modulePx, quietZone: quiet, ink });
+      beamCtx.putImageData(new ImageData(frame.data, frame.width, frame.height), 0, 0);
+      label.textContent = `frame ${index} · ${emitFps}/s`;
+      index++;
+    }
     raf = requestAnimationFrame(tick);
   }
   raf = requestAnimationFrame(tick);
@@ -373,6 +401,14 @@ async function startCamera() {
   camCanvas.width = cam.videoWidth;
   camCanvas.height = cam.videoHeight;
 
+  // Drive off actual camera frames where the browser exposes them. Animation
+  // frames run at display refresh, roughly twice the camera's rate, so half
+  // the work decoded an image already decoded — expensive on a phone, and the
+  // wasted cycles come straight out of the real capture rate.
+  const schedule = cam.requestVideoFrameCallback
+    ? (fn) => cam.requestVideoFrameCallback(() => fn())
+    : (fn) => requestAnimationFrame(fn);
+
   function pump() {
     if (!receiving) { decoder.free(); return; }
 
@@ -383,7 +419,7 @@ async function startCamera() {
     try {
       status = decoder.ingestRGBA(image.width, image.height, image.data);
     } catch {
-      requestAnimationFrame(pump);
+      schedule(pump);
       return;
     }
 
@@ -415,9 +451,9 @@ async function startCamera() {
       stopCamera();
       return;
     }
-    requestAnimationFrame(pump);
+    schedule(pump);
   }
-  requestAnimationFrame(pump);
+  schedule(pump);
 }
 
 function finish(bytes) {
