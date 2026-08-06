@@ -161,20 +161,65 @@ const transmit = $('transmit');
 
 let pending = null; // { bytes, name }
 
+/**
+ * A one-byte container so the receiver knows whether to inflate.
+ *
+ * This is a demo-layer wrapper, not part of the protocol: PZ carries opaque
+ * bytes and has no opinion about their contents. Compressing before
+ * transmitting is the cheapest way to send more, because the optical channel
+ * is thousands of times slower than the CPU on either end — spending
+ * milliseconds to avoid seconds of transmission is always the right trade.
+ */
+const RAW = 0;
+const GZIP = 1;
+
+async function pack(bytes) {
+  if (typeof CompressionStream !== 'function') {
+    return { body: bytes, codec: RAW, ratio: 1 };
+  }
+  try {
+    const stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream('gzip'));
+    const squeezed = new Uint8Array(await new Response(stream).arrayBuffer());
+    // Incompressible input comes back slightly larger. Send the original then.
+    if (squeezed.length >= bytes.length) return { body: bytes, codec: RAW, ratio: 1 };
+    return { body: squeezed, codec: GZIP, ratio: bytes.length / squeezed.length };
+  } catch {
+    return { body: bytes, codec: RAW, ratio: 1 };
+  }
+}
+
+async function unpack(bytes) {
+  const codec = bytes[0];
+  const body = bytes.subarray(1);
+  if (codec !== GZIP) return body;
+  const stream = new Blob([body]).stream().pipeThrough(new DecompressionStream('gzip'));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+function withHeader(codec, body) {
+  const out = new Uint8Array(body.length + 1);
+  out[0] = codec;
+  out.set(body, 1);
+  return out;
+}
+
 function describe(bytes) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < MB) return `${(bytes / 1024).toFixed(1)} kB`;
   return `${(bytes / MB).toFixed(2)} MB`;
 }
 
-function buildPlan() {
+async function buildPlan() {
   if (!pending) return;
   releaseEncoder();
 
   const profile = $('profile').value;
+  const { body, codec, ratio } = await pack(pending.bytes);
+  const wire = withHeader(codec, body);
+
   let encoder;
   try {
-    encoder = pz.encode(pending.bytes, { profile });
+    encoder = pz.encode(wire, { profile });
   } catch (error) {
     if (!(error instanceof PzError)) throw error;
     alert(`Cannot encode that file: ${error.message}`);
@@ -190,7 +235,9 @@ function buildPlan() {
 
   plan.hidden = false;
   plan.querySelector('[data-k="size"]').textContent =
-    `${describe(pending.bytes.length)} · ${pending.name}`;
+    ratio > 1.02
+      ? `${describe(pending.bytes.length)} → ${describe(wire.length)} (${ratio.toFixed(1)}x)`
+      : `${describe(pending.bytes.length)} · ${pending.name}`;
   plan.querySelector('[data-k="blocks"]').textContent = `${encoder.blockCount} frames min`;
   plan.querySelector('[data-k="session"]').textContent =
     `0x${encoder.sessionId.toString(16).toUpperCase().padStart(4, '0')}`;
@@ -456,8 +503,15 @@ async function startCamera() {
   schedule(pump);
 }
 
-function finish(bytes) {
+async function finish(raw) {
   releaseResult();
+  let bytes;
+  try {
+    bytes = await unpack(raw);
+  } catch (error) {
+    alert(`Recovered the bytes but could not decompress them: ${error.message}`);
+    return;
+  }
   const blob = new Blob([bytes], { type: 'application/octet-stream' });
   owned.url = URL.createObjectURL(blob);
 

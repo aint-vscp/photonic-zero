@@ -95,10 +95,19 @@
       </tbody>
     </table>
     <p class="aside">
-      <b>mono</b> is the default here: one colour, on the largest grid. Pick any ink dark
-      enough to read against the page and the decoder calibrates to it automatically, because
-      it reads its thresholds off each frame rather than assuming black. Switch to <b>fast</b>
-      when you want the throughput and can spare the colour.
+      <b>mono</b> is the default: one colour, largest grid, and any ink dark enough to read.
+      The decoder calibrates to whatever colour you pick, because it reads its thresholds off
+      each frame rather than assuming black.
+    </p>
+    <p class="aside">
+      <b>For the fastest transfer, choose <code>fast</code> and 20 frames per second.</b>
+      That is 2,739 bytes per frame instead of 776 — about six times quicker than the
+      default, at the cost of needing colour and a steadier hand.
+    </p>
+    <p class="aside">
+      Files are gzipped before transmission, which is worth roughly 2.5x on text, source and
+      most binaries. The 1 MB sample here is random bytes, so it compresses by nothing at
+      all — that is the honest worst case, and what the timings above assume.
     </p>
   </section>
 
@@ -124,7 +133,7 @@
         </label>
 
         <button class="ghost" id="tiny" type="button">Send a 2 kB test first</button>
-        <button class="ghost" id="sample" type="button">Use a 1 MB sample instead</button>
+        <button class="ghost" id="sample" type="button">Use a 1 MB sample (incompressible)</button>
 
         <div class="field">
           <label for="profile">Profile</label>
