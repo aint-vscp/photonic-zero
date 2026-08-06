@@ -1,5 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "//": "Repo root config so importing this repository deploys with no setup. The site is static: web/ is served as-is, there is no build step, and the wasm module is a committed artifact.",
+  "outputDirectory": "web",
+  "framework": null,
   "headers": [
     {
       "source": "/lib/pz.wasm",
