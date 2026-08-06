@@ -1,10 +1,10 @@
 """Photonic Zero: data over light, from any screen to any camera.
 
 Photonic Zero encodes bytes into a stream of colour frames, displays them, and
-reconstructs the message from a camera capture. Unlike a QR code, a PZ
-transmission has no fixed length and needs no back channel: a screen cannot
-hear, so PZ uses a rateless fountain code and the receiver watches until it has
-enough frames, whichever ones those happened to be.
+reconstructs the message from a camera capture. A transmission has no fixed
+length and needs no back channel: a screen cannot hear, so PZ uses a rateless
+fountain code and the receiver watches until it has enough frames, whichever
+ones those happened to be.
 
 Sending::
 
@@ -59,4 +59,4 @@ __all__ = [
 ]
 
 #: The preset profiles, from most robust to fastest.
-PROFILES = ("robust", "balanced", "resilient", "fast")
+PROFILES = ("robust", "balanced", "resilient", "fast", "mono")

@@ -199,6 +199,7 @@ fn decodes_a_dead_on_capture() {
         module_px: 8,
         quiet_zone: 4,
         background: [255, 255, 255],
+        ink: None,
     };
 
     let progress = shoot_and_decode(&encoder, &mut decoder, 0, &Camera::default(), &opts);
@@ -236,6 +237,7 @@ fn decodes_through_perspective_blur_and_noise() {
         module_px: 10,
         quiet_zone: 4,
         background: [255, 255, 255],
+        ink: None,
     };
 
     let cam = Camera {
@@ -331,6 +333,7 @@ fn decodes_every_grid_size_through_the_lens() {
             module_px: 8,
             quiet_zone: 4,
             background: [255, 255, 255],
+            ink: None,
         };
         let cam = Camera {
             out: opts.output_size(grid.modules()) * 5 / 4,
@@ -434,6 +437,7 @@ fn a_partially_occluded_frame_still_decodes() {
         module_px: 9,
         quiet_zone: 4,
         background: [255, 255, 255],
+        ink: None,
     };
 
     let frame = encoder.frame(0).unwrap();

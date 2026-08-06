@@ -4,10 +4,10 @@
 //! and reconstructs the message from a video capture of that display. No radio,
 //! no pairing, no network - just line of sight.
 //!
-//! Where a QR code is one static image holding a fixed number of bytes, a PZ
-//! transmission is a *rateless stream*. The transmitter never stops emitting
-//! frames and never needs to know which ones were seen. The receiver watches
-//! until it has enough, whichever ones those happened to be.
+//! A PZ transmission is a *rateless stream*, not a fixed image. The
+//! transmitter never stops emitting frames and never needs to know which ones
+//! were seen. The receiver watches until it has enough, whichever ones those
+//! happened to be.
 //!
 //! # The stack
 //!

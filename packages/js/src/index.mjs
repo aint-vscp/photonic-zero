@@ -18,6 +18,8 @@ const PROFILES = {
   fast: [4, 2, 1],
   /** 65x65, 4 colours with per-cell parity, 28% parity. */
   resilient: [2, 1, 3],
+  /** 97x97, two levels, 28% parity. Single-colour, and takes an `ink`. */
+  mono: [4, 0, 3],
 };
 
 /** Outcome codes returned by the decoder. */
@@ -52,11 +54,50 @@ function whole(value, name, min, max) {
  * value can disagree with the buffer that comes back. Rejecting the bad input
  * outright beats papering over the mismatch.
  */
-function renderOptions({ modulePx = 8, quietZone = 4 } = {}) {
+function renderOptions({ modulePx = 8, quietZone = 4, ink } = {}) {
   return {
     modulePx: whole(modulePx, 'modulePx', 1, 256),
     quietZone: whole(quietZone, 'quietZone', 0, 256),
+    ink: parseInk(ink),
   };
+}
+
+/**
+ * Normalise an ink colour to the packed integer the ABI takes, or -1 for none.
+ *
+ * Accepts `"#1a2b3c"`, `"#abc"`, `0x1a2b3c` or `[r, g, b]`. The dark-enough
+ * check is enforced here rather than in the module because a caller who picks
+ * an unusable brand colour wants to hear about it while writing the code, not
+ * as a transfer that quietly never locks on.
+ */
+function parseInk(ink) {
+  if (ink === undefined || ink === null) return -1;
+
+  let rgb;
+  if (Array.isArray(ink)) {
+    if (ink.length !== 3) throw new PzError('ink array must be [r, g, b]');
+    rgb = ink.map((c) => whole(c, 'ink channel', 0, 255));
+  } else if (typeof ink === 'number') {
+    rgb = [(ink >> 16) & 255, (ink >> 8) & 255, ink & 255];
+    whole(ink, 'ink', 0, 0xffffff);
+  } else if (typeof ink === 'string') {
+    let hex = ink.trim().replace(/^#/, '');
+    if (hex.length === 3) hex = hex.replace(/./g, (c) => c + c);
+    if (!/^[0-9a-fA-F]{6}$/.test(hex)) throw new PzError(`ink is not a colour: ${ink}`);
+    rgb = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  } else {
+    throw new PzError(`ink must be a hex string, a number or [r, g, b], got ${typeof ink}`);
+  }
+
+  // Rec. 601 luminance against a white page, matching pz-core's own check.
+  const luma = (0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]) / 255;
+  if (1 - luma < 0.45) {
+    throw new PzError(
+      `ink #${rgb.map((c) => c.toString(16).padStart(2, '0')).join('')} is too light to ` +
+        'demodulate against white; use a deeper colour',
+    );
+  }
+  return (rgb[0] << 16) | (rgb[1] << 8) | rgb[2];
 }
 
 /** Largest RGBA render this will attempt, in bytes. */
@@ -266,11 +307,11 @@ export class Encoder {
   frameRGBA(index, options = {}) {
     this._check();
     whole(index, 'index', 0, 0xffffffff);
-    const { modulePx, quietZone } = renderOptions(options);
+    const { modulePx, quietZone, ink } = renderOptions(options);
     const side = checkRenderSize(this.modules, modulePx, quietZone);
     const out = this._pz._scratch();
     const ptr = this._pz.exports.pz_encoder_frame_rgba(
-      this._handle, index, modulePx, quietZone, out,
+      this._handle, index, modulePx, quietZone, ink, out,
     );
     const len = this._pz._readLen(out);
     this._pz.exports.pz_free(out, 4);
@@ -288,11 +329,11 @@ export class Encoder {
   framePNG(index, options = {}) {
     this._check();
     whole(index, 'index', 0, 0xffffffff);
-    const { modulePx, quietZone } = renderOptions(options);
+    const { modulePx, quietZone, ink } = renderOptions(options);
     checkRenderSize(this.modules, modulePx, quietZone);
     const out = this._pz._scratch();
     const ptr = this._pz.exports.pz_encoder_frame_png(
-      this._handle, index, modulePx, quietZone, out,
+      this._handle, index, modulePx, quietZone, ink, out,
     );
     const len = this._pz._readLen(out);
     this._pz.exports.pz_free(out, 4);

@@ -485,6 +485,7 @@ pub unsafe extern "C" fn pz_encoder_render_rgb(
                 module_px: module_px.max(1),
                 quiet_zone,
                 background: [255, 255, 255],
+                ink: None,
             },
         );
         if !out_size.is_null() {
@@ -517,6 +518,7 @@ pub unsafe extern "C" fn pz_encoder_render_png(
                 module_px: module_px.max(1),
                 quiet_zone,
                 background: [255, 255, 255],
+                ink: None,
             },
         );
         Ok(PzBuffer::from_vec(pz_core::png::encode(&image)))

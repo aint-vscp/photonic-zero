@@ -55,6 +55,24 @@ impl EncoderConfig {
         }
     }
 
+    /// Single-colour at full grid: 97x97 in black and white at 28% parity.
+    ///
+    /// The same two-level modulation as [`Self::robust`] on the largest grid,
+    /// which buys back most of the throughput that dropping to one bit per
+    /// cell costs. Pair it with [`RenderOptions::ink`] to draw it in any
+    /// sufficiently dark colour.
+    ///
+    /// [`RenderOptions::ink`]: crate::render::RenderOptions::ink
+    #[must_use]
+    pub fn mono() -> Self {
+        Self {
+            grid: GridSize::G97,
+            mode: ColorMode::Mono,
+            parity_code: 3,
+            ..Self::default()
+        }
+    }
+
     /// The highest-throughput profile: 97x97 in 8 colours at 16% parity.
     ///
     /// Needs a steady, well-focused, close-up capture.

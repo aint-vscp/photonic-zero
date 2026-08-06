@@ -581,10 +581,15 @@ impl Decoder {
     }
 
     /// Forget the current session so a new transmission can be received.
+    ///
+    /// Both counters clear, not just one. They describe the reception in
+    /// progress, and leaving `frames_seen` running while `frames_accepted`
+    /// restarts makes the pair read as an implausible acceptance rate.
     pub fn reset(&mut self) {
         self.session = None;
         self.finished = None;
         self.frames_accepted = 0;
+        self.frames_seen = 0;
     }
 
     /// Offer a captured image.

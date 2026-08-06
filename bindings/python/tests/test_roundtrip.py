@@ -5,6 +5,8 @@ Run with: pytest
 SPDX-License-Identifier: MIT OR Apache-2.0
 """
 
+from collections import Counter
+
 import pytest
 
 import photonic_zero as pz
@@ -31,7 +33,7 @@ def transfer(payload: bytes, *, profile: str = "balanced", keep=lambda i: True):
 def test_module_metadata():
     assert pz.PROTOCOL_VERSION == 1
     assert isinstance(pz.__version__, str)
-    assert pz.PROFILES == ("robust", "balanced", "resilient", "fast")
+    assert pz.PROFILES == ("robust", "balanced", "resilient", "fast", "mono")
 
 
 def test_round_trips_a_short_message():
@@ -228,3 +230,46 @@ def test_profile_info():
     assert droplet == 2739
     with pytest.raises(ValueError):
         pz.profile_info("nope")
+
+
+def test_mono_profile_recoloured_with_ink_round_trips():
+    """Ink is a rendering choice, so it must not affect decodability.
+
+    The decoder calibrates from each frame's own reference patches, so it
+    never assumed the dark level was black to begin with.
+    """
+    message = b"ink is a rendering concern, not a protocol one"
+    encoder = pz.Encoder(message, profile="mono")
+    decoder = pz.Decoder()
+
+    width, height, pixels = encoder.rgb(0, module_px=6, ink="#1a2b3c")
+    counts = Counter(
+        tuple(pixels[i : i + 3]) for i in range(0, len(pixels), 3)
+    )
+
+    assert counts[(0, 0, 0)] == 0, "ink did not replace black"
+    assert counts[(26, 43, 60)] > 0, "ink is not on the page"
+
+    # Everything except the six chromatic calibration patches is two-tone. The
+    # decoder needs those patches to correct for auto-white-balance, so a mono
+    # frame is very nearly, but not exactly, single-colour.
+    two_tone = counts[(26, 43, 60)] + counts[(255, 255, 255)]
+    chromatic = width * height - two_tone
+    assert chromatic / (width * height) < 0.005, (
+        f"expected under 0.5% chromatic, got {chromatic / (width * height):.3%}"
+    )
+
+    for index in range(400):
+        width, height, pixels = encoder.rgb(index, module_px=6, ink=(26, 43, 60))
+        if decoder.ingest(width, height, pixels).complete:
+            break
+
+    assert decoder.result == message
+
+
+def test_ink_too_light_is_refused():
+    encoder = pz.Encoder(b"pale ink", profile="mono")
+    with pytest.raises(ValueError):
+        encoder.rgb(0, ink="#e0d0c0")
+    with pytest.raises(ValueError):
+        encoder.png(0, ink="not-a-colour")

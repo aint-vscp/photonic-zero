@@ -58,6 +58,25 @@ pub extern "C" fn pz_protocol_version() -> u32 {
     pz_core::PROTOCOL_VERSION as u32
 }
 
+/// Turn a JavaScript ink argument into render options.
+///
+/// `ink` is `0xRRGGBB`, or negative for "leave the frame as generated". A
+/// packed integer rather than three arguments keeps the exported signatures
+/// short, and JavaScript has no natural byte-triple to pass anyway.
+fn render_options(module_px: usize, quiet_zone: usize, ink: i32) -> RenderOptions {
+    RenderOptions {
+        module_px: module_px.max(1),
+        quiet_zone,
+        background: [255, 255, 255],
+        ink: if ink < 0 {
+            None
+        } else {
+            let v = ink as u32;
+            Some([(v >> 16) as u8, (v >> 8) as u8, v as u8])
+        },
+    }
+}
+
 fn into_buffer(bytes: Vec<u8>, out_len: *mut usize) -> *mut u8 {
     if bytes.is_empty() {
         return ptr::null_mut();
@@ -195,6 +214,7 @@ pub unsafe extern "C" fn pz_encoder_frame_rgba(
     index: u32,
     module_px: usize,
     quiet_zone: usize,
+    ink: i32,
     out_len: *mut usize,
 ) -> *mut u8 {
     if encoder.is_null() {
@@ -202,14 +222,7 @@ pub unsafe extern "C" fn pz_encoder_frame_rgba(
     }
     match (*encoder).inner.frame(index) {
         Ok(frame) => {
-            let image = render(
-                &frame,
-                &RenderOptions {
-                    module_px: module_px.max(1),
-                    quiet_zone,
-                    background: [255, 255, 255],
-                },
-            );
+            let image = render(&frame, &render_options(module_px, quiet_zone, ink));
             into_buffer(image.to_rgba(), out_len)
         }
         Err(_) => ptr::null_mut(),
@@ -226,6 +239,7 @@ pub unsafe extern "C" fn pz_encoder_frame_png(
     index: u32,
     module_px: usize,
     quiet_zone: usize,
+    ink: i32,
     out_len: *mut usize,
 ) -> *mut u8 {
     if encoder.is_null() {
@@ -233,14 +247,7 @@ pub unsafe extern "C" fn pz_encoder_frame_png(
     }
     match (*encoder).inner.frame(index) {
         Ok(frame) => {
-            let image = render(
-                &frame,
-                &RenderOptions {
-                    module_px: module_px.max(1),
-                    quiet_zone,
-                    background: [255, 255, 255],
-                },
-            );
+            let image = render(&frame, &render_options(module_px, quiet_zone, ink));
             into_buffer(pz_core::png::encode(&image), out_len)
         }
         Err(_) => ptr::null_mut(),
@@ -446,7 +453,7 @@ mod tests {
             let mut kind = 0;
             for index in 0..64u32 {
                 let mut len = 0usize;
-                let rgba = pz_encoder_frame_rgba(encoder, index, 6, 4, &mut len);
+                let rgba = pz_encoder_frame_rgba(encoder, index, 6, 4, -1, &mut len);
                 assert!(!rgba.is_null());
                 let side = (49 + 8) * 6;
                 assert_eq!(len, side * side * 4);
@@ -477,7 +484,7 @@ mod tests {
         unsafe {
             let encoder = pz_encoder_new(payload.as_ptr(), payload.len(), 0, 0, 3, 7);
             let mut len = 0usize;
-            let png = pz_encoder_frame_png(encoder, 0, 4, 4, &mut len);
+            let png = pz_encoder_frame_png(encoder, 0, 4, 4, -1, &mut len);
             assert!(!png.is_null());
             let bytes = slice::from_raw_parts(png, len);
             assert_eq!(&bytes[..8], &[137, 80, 78, 71, 13, 10, 26, 10]);
@@ -558,7 +565,7 @@ mod tests {
             let decoder = pz_decoder_new();
 
             let mut len = 0usize;
-            let rgba = pz_encoder_frame_rgba(encoder, 0, 6, 4, &mut len);
+            let rgba = pz_encoder_frame_rgba(encoder, 0, 6, 4, -1, &mut len);
             let side = (49 + 8) * 6;
             assert_eq!(pz_decoder_ingest_rgba(decoder, side, side, rgba, len), 3);
             pz_free(rgba, len);

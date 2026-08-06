@@ -24,15 +24,70 @@ fn to_py(error: PzError) -> PyErr {
     PhotonicZeroError::new_err(error.to_string())
 }
 
+/// Build render options, validating the ink before anything is drawn.
+///
+/// `ink` is `"#1a2b3c"` or an `(r, g, b)` tuple. A colour too close to the
+/// page cannot be demodulated, and failing here beats handing back frames that
+/// never lock on.
+fn options_for(
+    module_px: usize,
+    quiet_zone: usize,
+    ink: Option<&Bound<'_, PyAny>>,
+) -> PyResult<RenderOptions> {
+    let ink = match ink {
+        None => None,
+        Some(value) => Some(parse_ink(value)?),
+    };
+    let options = RenderOptions {
+        module_px: module_px.max(1),
+        quiet_zone,
+        background: [255, 255, 255],
+        ink,
+    };
+    if !options.contrast_ok() {
+        return Err(PyValueError::new_err(
+            "ink is too light to demodulate against a white page; use a deeper colour",
+        ));
+    }
+    Ok(options)
+}
+
+fn parse_ink(value: &Bound<'_, PyAny>) -> PyResult<[u8; 3]> {
+    if let Ok(text) = value.extract::<String>() {
+        let hex = text.trim().trim_start_matches('#');
+        let hex = if hex.len() == 3 {
+            hex.chars().flat_map(|c| [c, c]).collect::<String>()
+        } else {
+            hex.to_owned()
+        };
+        if hex.len() != 6 {
+            return Err(PyValueError::new_err(format!(
+                "ink is not a colour: {text:?}"
+            )));
+        }
+        let mut rgb = [0u8; 3];
+        for (i, slot) in rgb.iter_mut().enumerate() {
+            *slot = u8::from_str_radix(&hex[i * 2..i * 2 + 2], 16)
+                .map_err(|_| PyValueError::new_err(format!("ink is not a colour: {text:?}")))?;
+        }
+        return Ok(rgb);
+    }
+    value
+        .extract::<[u8; 3]>()
+        .map_err(|_| PyValueError::new_err("ink must be a '#rrggbb' string or an (r, g, b) tuple"))
+}
+
 fn config_for(profile: &str) -> PyResult<EncoderConfig> {
     Ok(match profile {
         "balanced" | "default" => EncoderConfig::default(),
         "robust" => EncoderConfig::robust(),
         "fast" => EncoderConfig::fast(),
         "resilient" => EncoderConfig::resilient(),
+        "mono" => EncoderConfig::mono(),
         other => {
             return Err(PyValueError::new_err(format!(
-                "unknown profile {other:?}; expected 'balanced', 'robust', 'fast' or 'resilient'"
+                "unknown profile {other:?}; expected 'balanced', 'robust', 'fast', \
+                 'resilient' or 'mono'"
             )))
         }
     })
@@ -141,44 +196,32 @@ impl Encoder {
     }
 
     /// Render one frame as a complete PNG file.
-    #[pyo3(signature = (index, *, module_px = 8, quiet_zone = 4))]
+    #[pyo3(signature = (index, *, module_px = 8, quiet_zone = 4, ink = None))]
     fn png<'py>(
         &self,
         py: Python<'py>,
         index: u32,
         module_px: usize,
         quiet_zone: usize,
+        ink: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<Bound<'py, PyBytes>> {
         let frame = self.inner.frame(index).map_err(to_py)?;
-        let image = render(
-            &frame,
-            &RenderOptions {
-                module_px: module_px.max(1),
-                quiet_zone,
-                background: [255, 255, 255],
-            },
-        );
+        let image = render(&frame, &options_for(module_px, quiet_zone, ink)?);
         Ok(PyBytes::new(py, &pz_core::png::encode(&image)))
     }
 
     /// Render one frame as raw RGB, returning `(width, height, pixels)`.
-    #[pyo3(signature = (index, *, module_px = 8, quiet_zone = 4))]
+    #[pyo3(signature = (index, *, module_px = 8, quiet_zone = 4, ink = None))]
     fn rgb<'py>(
         &self,
         py: Python<'py>,
         index: u32,
         module_px: usize,
         quiet_zone: usize,
+        ink: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<(usize, usize, Bound<'py, PyBytes>)> {
         let frame = self.inner.frame(index).map_err(to_py)?;
-        let image = render(
-            &frame,
-            &RenderOptions {
-                module_px: module_px.max(1),
-                quiet_zone,
-                background: [255, 255, 255],
-            },
-        );
+        let image = render(&frame, &options_for(module_px, quiet_zone, ink)?);
         Ok((image.width, image.height, PyBytes::new(py, &image.data)))
     }
 

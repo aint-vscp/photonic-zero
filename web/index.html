@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Photonic Zero — send a file with light</title>
+<meta name="description" content="Point a phone at a screen. Watch a megabyte cross the gap on nothing but light. No wifi, no pairing, no upload.">
+<meta name="theme-color" content="#fafafb">
+
+<meta property="og:title" content="Photonic Zero — send a file with light">
+<meta property="og:description" content="Point a phone at a screen. A megabyte crosses the gap on nothing but light.">
+<meta property="og:type" content="website">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anybody:wdth,wght@75..125,400..900&family=Archivo:wght@400;500;600&family=Martian+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+
+<a class="skip" href="#try">Skip to the demo</a>
+
+<header class="masthead">
+  <span class="wordmark">PZ</span>
+  <span class="masthead-meta" id="masthead-meta">wire format 1</span>
+</header>
+
+<main>
+
+  <section class="beat beat-hero" data-beat="hero">
+    <p class="eyebrow">Photonic Zero</p>
+    <h1>A megabyte,<br>carried by light.</h1>
+    <p class="lede">
+      Point a phone camera at this screen. The file crosses the gap on nothing but
+      photons — no wifi, no bluetooth, no pairing, no upload.
+    </p>
+  </section>
+
+  <section class="beat" data-beat="why">
+    <h2>A screen cannot hear you.</h2>
+    <p>
+      That single fact defines the whole design space. Show a sequence of frames to a
+      camera and it will miss some — autofocus hunts, a hand shakes, the operating system
+      schedules something else. There is no back channel. Nothing can ask for frame 47 again.
+    </p>
+    <p>
+      The obvious answer is to loop forever and hope. That is the coupon collector problem:
+      slow, and unbounded in the worst case.
+    </p>
+  </section>
+
+  <section class="beat" data-beat="fountain">
+    <h2>So it never asks.</h2>
+    <p>
+      Every frame is a <em>droplet</em>: the XOR of a pseudo-randomly chosen subset of the
+      message's blocks. The receiver does not care <em>which</em> droplets it catches, only
+      <em>how many</em>. Collect a little over the minimum and the message falls out.
+    </p>
+    <p class="aside">
+      Frames <code>0..K</code> go out systematically, so a clean capture finishes at zero
+      coding overhead and only pays for the fountain when frames are genuinely lost.
+    </p>
+  </section>
+
+  <section class="beat" data-beat="loss">
+    <h2>Drop a quarter of them.</h2>
+    <p>
+      The counters below are a real transfer running in this tab right now, losing one
+      frame in four at random. Nothing is retransmitted and nothing restarts. Losing a
+      quarter of the frames simply costs a quarter more of them.
+    </p>
+    <div class="readout" id="loss-readout">
+      <div class="readout-row"><span>frames emitted</span><b data-k="emitted">0</b></div>
+      <div class="readout-row"><span>lost in flight</span><b data-k="lost">0</b></div>
+      <div class="readout-row"><span>reached decoder</span><b data-k="seen">0</b></div>
+      <div class="readout-row"><span>blocks recovered</span><b data-k="blocks">0 / 0</b></div>
+      <div class="meter"><i id="loss-meter"></i></div>
+    </div>
+  </section>
+
+  <section class="beat" data-beat="numbers">
+    <h2>What a megabyte costs.</h2>
+    <p>
+      Measured on this build, not estimated. The bottleneck is the display refresh rate,
+      not the decoder — which leaves plenty of headroom on a phone.
+    </p>
+    <table class="numbers">
+      <thead><tr><th>Profile</th><th>Grid</th><th>Per frame</th><th>Frames / MB</th><th>Best case</th></tr></thead>
+      <tbody>
+        <tr class="is-pick"><td>mono</td><td>97²</td><td>776 B</td><td>1,352</td><td>45 s</td></tr>
+        <tr><td>robust</td><td>33²</td><td>34 B</td><td>30,840</td><td>17 min</td></tr>
+        <tr><td>balanced</td><td>49²</td><td>479 B</td><td>2,190</td><td>73 s</td></tr>
+        <tr><td>resilient</td><td>65²</td><td>640 B</td><td>1,639</td><td>55 s</td></tr>
+        <tr><td>fast</td><td>97²</td><td>2,739 B</td><td>383</td><td>13 s</td></tr>
+      </tbody>
+    </table>
+    <p class="aside">
+      <b>mono</b> is the default here: one colour, on the largest grid. Pick any ink dark
+      enough to read against the page and the decoder calibrates to it automatically, because
+      it reads its thresholds off each frame rather than assuming black. Switch to <b>fast</b>
+      when you want the throughput and can spare the colour.
+    </p>
+  </section>
+
+  <section class="beat beat-try" id="try" data-beat="try">
+    <h2>Try it.</h2>
+    <p class="lede">
+      Open this page on a second device to receive. Nothing is uploaded — the file is read,
+      encoded and decoded entirely inside the two browsers.
+    </p>
+
+    <div class="panels">
+
+      <article class="panel" id="panel-send">
+        <header>
+          <h3>Send</h3>
+          <p>This screen becomes the transmitter.</p>
+        </header>
+
+        <label class="drop" id="drop">
+          <input type="file" id="file" hidden>
+          <span class="drop-primary">Choose a file</span>
+          <span class="drop-secondary">or drop one here</span>
+        </label>
+
+        <button class="ghost" id="sample" type="button">Use a 1 MB sample instead</button>
+
+        <div class="field">
+          <label for="profile">Profile</label>
+          <select id="profile">
+            <option value="mono" selected>mono — 97², single colour</option>
+            <option value="fast">fast — 97², 8 colours, fastest</option>
+            <option value="resilient">resilient — 65², 4 colours</option>
+            <option value="balanced">balanced — 49², 8 colours</option>
+            <option value="robust">robust — 33², single colour</option>
+          </select>
+        </div>
+
+        <div class="field" id="ink-field">
+          <label for="ink">Ink</label>
+          <div class="ink-row">
+            <input type="color" id="ink" value="#141414">
+            <output id="ink-note">any colour dark enough to read</output>
+          </div>
+        </div>
+
+        <dl class="plan" id="plan" hidden>
+          <div><dt>payload</dt><dd data-k="size">—</dd></div>
+          <div><dt>blocks</dt><dd data-k="blocks">—</dd></div>
+          <div><dt>session</dt><dd data-k="session">—</dd></div>
+          <div><dt>estimate</dt><dd data-k="eta">—</dd></div>
+        </dl>
+
+        <button class="primary" id="transmit" type="button" disabled>Transmit</button>
+        <p class="note">Fills the screen. Tap or press Escape to stop.</p>
+      </article>
+
+      <article class="panel" id="panel-receive">
+        <header>
+          <h3>Receive</h3>
+          <p>This device becomes the camera.</p>
+        </header>
+
+        <div class="viewport">
+          <video id="cam" playsinline muted></video>
+          <canvas id="cam-canvas" hidden></canvas>
+          <div class="viewport-empty" id="cam-empty">
+            <span>Camera off</span>
+          </div>
+          <div class="reticle" aria-hidden="true"></div>
+        </div>
+
+        <button class="primary" id="camera" type="button">Start camera</button>
+
+        <div class="progress" id="progress" hidden>
+          <div class="progress-head">
+            <span id="progress-state">searching</span>
+            <b id="progress-pct">0%</b>
+          </div>
+          <div class="meter"><i id="progress-meter"></i></div>
+          <dl class="plan">
+            <div><dt>seen</dt><dd data-k="seen">0</dd></div>
+            <div><dt>absorbed</dt><dd data-k="accepted">0</dd></div>
+            <div><dt>blocks</dt><dd data-k="blocks">0 / 0</dd></div>
+            <div><dt>session</dt><dd data-k="session">—</dd></div>
+          </dl>
+        </div>
+
+        <div class="done" id="done" hidden>
+          <p><b id="done-size">0 B</b> recovered, checksum verified.</p>
+          <a class="primary" id="save" download>Save it</a>
+          <button class="ghost" id="again" type="button">Receive another</button>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <section class="beat" data-beat="privacy">
+    <h2>Nothing is stored.</h2>
+    <p>
+      There is no backend. This page is static files on a CDN; your file is read into memory,
+      encoded by a 100 kB WebAssembly module, and drawn to a canvas. It is never sent
+      anywhere, because sending it somewhere would defeat the entire point of an air-gap
+      protocol.
+    </p>
+    <p class="aside">
+      The decoded result lives in an object URL that is revoked the moment you leave, start
+      another transfer, or hide the tab. Close this page and it is gone.
+    </p>
+  </section>
+
+  <section class="beat beat-end" data-beat="end">
+    <h2>Take it apart.</h2>
+    <p>
+      Rust core with zero external dependencies, <code>no_std</code>, plus bindings for
+      JavaScript, Python and C.
+    </p>
+    <pre class="install"><code>npm  install photonic-zero
+pip  install photonic-zero
+cargo add pz-core</code></pre>
+    <p class="links">
+      <a href="https://github.com/aint-vscp/photonic-zero">Source</a>
+      <a href="https://github.com/aint-vscp/photonic-zero/blob/main/rfc/RFC-0001-pz-frame-format.md">Wire format</a>
+    </p>
+    <p class="warn">
+      PZ is a transport, not a security protocol. It provides no confidentiality and no
+      authenticity — anything with a view of the screen can read the frames. Encrypt before
+      you transmit if that matters. v0.1.0, wire format unfrozen, not independently audited.
+    </p>
+  </section>
+
+</main>
+
+<!-- Fullscreen transmitter -->
+<div class="beam" id="beam" hidden>
+  <canvas id="beam-canvas"></canvas>
+  <div class="beam-hud">
+    <span id="beam-frame">frame 0</span>
+    <span id="beam-hint">hold steady · tap to stop</span>
+  </div>
+</div>
+
+<noscript>
+  <p class="noscript">This demo runs the protocol in your browser, so it needs JavaScript.</p>
+</noscript>
+
+<script type="module" src="./app.mjs"></script>
+</body>
+</html>

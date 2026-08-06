@@ -241,6 +241,7 @@ fn cmd_encode(input: &[String]) -> Result<(), String> {
         module_px,
         quiet_zone,
         background: [255, 255, 255],
+        ink: None,
     };
 
     for index in 0..count {

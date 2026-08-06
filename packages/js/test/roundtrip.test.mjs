@@ -242,6 +242,47 @@ test('a render too large for wasm memory throws instead of trapping', () => {
   encoder.free();
 });
 
+test('a mono frame recoloured with ink still round trips', () => {
+  const message = 'ink is a rendering concern';
+  const encoder = pz.encode(message, { profile: 'mono' });
+  const decoder = pz.decoder();
+
+  const frame = encoder.frameRGBA(0, { modulePx: 6, ink: '#1a2b3c' });
+
+  // Nothing pure black should remain: every dark cell wears the ink.
+  let blackPixels = 0;
+  for (let i = 0; i < frame.data.length; i += 4) {
+    if (frame.data[i] === 0 && frame.data[i + 1] === 0 && frame.data[i + 2] === 0) blackPixels++;
+  }
+  assert.equal(blackPixels, 0, 'ink did not replace black');
+
+  let out = null;
+  for (let index = 0; index < 400 && out === null; index++) {
+    const f = encoder.frameRGBA(index, { modulePx: 6, ink: '#1a2b3c' });
+    const status = decoder.ingestRGBA(f.width, f.height, f.data);
+    if (status.complete) out = decoder.result();
+  }
+  assert.equal(new TextDecoder().decode(out), message);
+
+  encoder.free();
+  decoder.free();
+});
+
+test('ink accepts the usual colour spellings and rejects pale ones', () => {
+  const encoder = pz.encode('ink forms', { profile: 'mono' });
+
+  for (const ink of ['#1a2b3c', '#123', 0x1a2b3c, [26, 43, 60]]) {
+    assert.ok(encoder.frameRGBA(0, { modulePx: 2, ink }).data.length > 0, `rejected ${ink}`);
+  }
+
+  // Too light to demodulate against a white page.
+  assert.throws(() => encoder.frameRGBA(0, { ink: '#e0d0c0' }), PzError);
+  assert.throws(() => encoder.frameRGBA(0, { ink: 'notacolour' }), PzError);
+  assert.throws(() => encoder.frameRGBA(0, { ink: [1, 2] }), PzError);
+
+  encoder.free();
+});
+
 test('a session id wider than the wire format is refused', () => {
   assert.throws(() => pz.encode('x', { sessionId: 65536 }), PzError);
   assert.throws(() => pz.encode('x', { sessionId: -1 }), PzError);

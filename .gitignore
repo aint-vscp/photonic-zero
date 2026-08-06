@@ -62,3 +62,7 @@ bindings/java/target/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Copied from packages/js by the demo's own sync step, not authored here.
+web/lib/index.mjs
+web/lib/pz.wasm

@@ -4,10 +4,10 @@
 zero network.
 
 Photonic Zero encodes bytes into a stream of colour frames, displays them, and
-reconstructs the message from a camera capture. Unlike a QR code, a PZ
-transmission has no fixed length and needs no back channel — a screen cannot
-hear, so PZ uses a rateless fountain code and the receiver simply watches until
-it has enough frames, whichever ones those happened to be.
+reconstructs the message from a camera capture. A transmission has no fixed
+length and needs no back channel — a screen cannot hear, so PZ uses a rateless
+fountain code and the receiver simply watches until it has enough frames,
+whichever ones those happened to be.
 
 This package is the WebAssembly build. No dependencies, ~100 kB of wasm, and it
 works in browsers and in Node.

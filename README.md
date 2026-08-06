@@ -33,18 +33,20 @@ it as your only defence against anything that matters yet.
 
 ---
 
-## Why not just an animated QR code
+## The problem PZ solves
 
-A QR code is one static image holding a fixed number of bytes. To send more you
-must show a sequence — and the instant you do, you have a protocol problem: the
-receiver will miss frames, and **a screen cannot hear**. There is no back
-channel over which to say "resend frame 47".
+**A screen cannot hear.** That single fact defines the whole design space.
 
-Most animated-barcode schemes answer this by looping forever and hoping the
-receiver eventually sees each frame at least once. That is the coupon collector
-problem, and it is slow and unbounded in the worst case.
+Any scheme that shows a sequence of images to a camera has a protocol problem
+the moment the sequence is longer than one frame: the receiver will miss some.
+Autofocus hunts, a hand shakes, the operating system schedules something else.
+And there is no back channel — no way to say *resend frame 47*.
 
-PZ answers it differently. It is a **rateless** stream:
+The obvious answer is to loop forever and hope the receiver eventually catches
+each frame at least once. That is the coupon collector problem: slow, and
+unbounded in the worst case.
+
+PZ does not loop. It is a **rateless** stream:
 
 - The transmitter emits an endless sequence of *droplets*, each an XOR of a
   pseudo-randomly chosen subset of the message's blocks.
@@ -54,17 +56,21 @@ PZ answers it differently. It is a **rateless** stream:
   so a clean capture finishes with zero coding overhead and only pays for the
   fountain when frames are actually lost.
 
-Nothing ever needs to be requested, acknowledged, or retransmitted.
+Nothing is ever requested, acknowledged, or retransmitted. Loss is not an error
+path — it is the design assumption.
 
-| | QR code | PZ |
-|---|---|---|
-| Payload | Fixed, up to ~3 KB | Unbounded stream |
-| Frame loss | Fatal, rescan | Absorbed by design |
-| Back channel | Not needed (one frame) | Not needed (rateless) |
-| Bits per cell | 1 | 1, 2 or 3 |
-| Error correction | Reed-Solomon | Reed-Solomon **and** LT fountain codes |
-| Orientation | 3 finders, fixed | 4 finders, decodes at any rotation |
-| Perspective | Affine (+ alignment patterns) | Full projective homography |
+What that buys, concretely:
+
+| | |
+|---|---|
+| Payload | An unbounded stream, not a fixed capacity |
+| Frame loss | Absorbed; costs proportionally more frames, never a restart |
+| Back channel | None required, by construction |
+| Bits per cell | 1, 2 or 3, chosen per transmission |
+| Error correction | Reed-Solomon **within** a frame, LT fountain codes **across** frames |
+| Orientation | Four finder patterns; decodes at any rotation |
+| Perspective | Full projective homography, not an affine approximation |
+| Colour | Recalibrated per frame against on-frame reference patches |
 
 ---
 
@@ -126,11 +132,12 @@ reads wrong turns a legal codeword into an illegal one. The decoder cannot tell
 `Rgb4` carries two thirds of `Rgb8`'s raw bits but hands the FEC layer far better
 information, and usually wins on a marginal capture.
 
-**Four finder patterns, not three.** QR locates itself from three. Three points
-define an *affine* transform, which cannot express perspective — and a phone held
-at an angle to a screen produces genuine perspective, where the far edge is
-shorter than the near edge. PZ uses four identical 7×7 finders, which is exactly
-what a projective homography needs. Identical markers leave the rotation
+**Four finder patterns.** Three points define an *affine* transform, which
+cannot express perspective — and a phone held at an angle to a screen produces
+genuine perspective, where the far edge is shorter than the near edge. PZ uses
+four identical 7×7 finders, which is exactly what a projective homography
+needs, so it corrects the distortion rather than approximating around it.
+Identical markers leave the rotation
 ambiguous, so the decoder tries all four and lets the CRC-protected header
 arbitrate: cheaper and stricter than any geometric tie-break, and it means a
 frame decodes upside down for free.
@@ -468,7 +475,8 @@ For security reports, see [SECURITY.md](SECURITY.md).
 ## Acknowledgements
 
 PZ stands on well-established work: Luby's LT codes, the Reed-Solomon literature,
-and the finder-pattern approach that QR codes made ubiquitous. The contribution
+and decades of matrix-symbology research on run-length finder patterns
+(ISO/IEC 18004 among them). The contribution
 here is the combination — two-layer FEC with confidence-driven erasures, applied
 to a screen-to-camera channel — not the individual pieces.
 
