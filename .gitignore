@@ -63,6 +63,6 @@ bindings/java/target/
 Thumbs.db
 desktop.ini
 
-# Copied from packages/js by the demo's own sync step, not authored here.
-web/lib/index.mjs
-web/lib/pz.wasm
+# web/lib/ is deliberately NOT ignored. Vercel deploys from git and has no
+# Rust toolchain, so the wasm module has to be a committed artifact for the
+# demo to be deployable from a plain static host.
